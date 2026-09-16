@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Ours",
+    "slug": "planner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E8ECE7"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "us.kodera.ours"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E8ECE7",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
