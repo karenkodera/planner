@@ -315,7 +315,6 @@ export function WeekDayCards() {
     couple,
     jumpToDay,
   } = useCalendar();
-  const [monthOpen, setMonthOpen] = useState(false);
   const [dayDetailOpen, setDayDetailOpen] = useState(false);
   const [detailDay, setDetailDay] = useState(selectedDay);
   const pagerRef = useRef<ScrollView>(null);
@@ -428,25 +427,12 @@ export function WeekDayCards() {
                     }
                   />
                 ))}
-
-                <PressableScale
-                  style={styles.monthButton}
-                  onPress={() => setMonthOpen(true)}
-                  haptic="light"
-                >
-                  <Ionicons name="calendar-outline" size={18} color={colors.inkSoft} />
-                  <Text style={styles.monthButtonText}>Calendar view</Text>
-                </PressableScale>
               </ScrollView>
             </View>
           );
         })}
       </ScrollView>
 
-      <MonthViewModal
-        visible={monthOpen}
-        onClose={() => setMonthOpen(false)}
-      />
       <DayDetailModal
         visible={dayDetailOpen}
         initialDay={detailDay}
@@ -456,7 +442,7 @@ export function WeekDayCards() {
   );
 }
 
-function MonthViewModal({
+export function MonthViewModal({
   visible,
   onClose,
 }: {
@@ -856,24 +842,6 @@ const styles = StyleSheet.create({
   },
   requestPillOutgoing: {
     color: colors.muted,
-  },
-  monthButton: {
-    marginTop: 12,
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.fill,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    minHeight: 48,
-  },
-  monthButtonText: {
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 13,
-    color: colors.inkSoft,
   },
   monthOverlay: {
     flex: 1,

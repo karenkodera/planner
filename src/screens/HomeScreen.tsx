@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { PressableScale } from '../components/PressableScale';
-import { WeekDayCards } from '../components/WeekCalendar';
+import { MonthViewModal, WeekDayCards } from '../components/WeekCalendar';
 import { SheetsHost } from '../components/Sheets';
 import { useCalendar } from '../store/CalendarContext';
 import { colors } from '../theme/colors';
@@ -46,6 +46,7 @@ export function HomeScreen() {
   const lastWeekTap = useRef(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [requestsOpen, setRequestsOpen] = useState(false);
+  const [monthOpen, setMonthOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchAnim = useRef(new Animated.Value(0)).current;
   const weekPulse = useRef(new Animated.Value(1)).current;
@@ -211,6 +212,15 @@ export function HomeScreen() {
               <View style={styles.iconGroup}>
                 <PressableScale
                   style={[styles.iconBtn, styles.iconBtnLeft]}
+                  onPress={() => setMonthOpen(true)}
+                  haptic="selection"
+                  scaleTo={0.9}
+                >
+                  <Ionicons name="calendar-outline" size={18} color={colors.ink} />
+                </PressableScale>
+                <View style={styles.iconDivider} />
+                <PressableScale
+                  style={styles.iconBtn}
                   onPress={() => openSheet({ type: 'create' })}
                   haptic="light"
                   scaleTo={0.9}
@@ -411,6 +421,7 @@ export function HomeScreen() {
         <WeekDayCards />
       </SafeAreaView>
 
+      <MonthViewModal visible={monthOpen} onClose={() => setMonthOpen(false)} />
       <SheetsHost />
     </AtmosphereBackground>
   );
