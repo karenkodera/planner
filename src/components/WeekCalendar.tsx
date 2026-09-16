@@ -27,8 +27,23 @@ import {
   overlaps,
 } from '../utils/date';
 
-function TogetherIcon({ size = 14 }: { size?: number }) {
-  return <Ionicons name="people" size={size} color={colors.shared} />;
+function OwnerBadge({
+  letter,
+  tone,
+}: {
+  letter: string;
+  tone: 'me' | 'partner';
+}) {
+  return (
+    <View
+      style={[
+        styles.ownerBadge,
+        tone === 'me' ? styles.ownerBadgeMe : styles.ownerBadgePartner,
+      ]}
+    >
+      <Text style={styles.ownerBadgeText}>{letter}</Text>
+    </View>
+  );
 }
 
 function MiniInitial({
@@ -51,6 +66,29 @@ function MiniInitial({
       <Text style={[styles.miniInitialText, selected && styles.miniInitialTextOnDark]}>
         {letter}
       </Text>
+    </View>
+  );
+}
+
+function OwnerBadges({
+  owner,
+  meInitial,
+  partnerInitial,
+}: {
+  owner: 'me' | 'partner' | 'shared' | 'both';
+  meInitial: string;
+  partnerInitial: string;
+}) {
+  if (owner === 'me') {
+    return <OwnerBadge letter={meInitial} tone="me" />;
+  }
+  if (owner === 'partner') {
+    return <OwnerBadge letter={partnerInitial} tone="partner" />;
+  }
+  return (
+    <View style={styles.ownerBadgePair}>
+      <OwnerBadge letter={meInitial} tone="me" />
+      <OwnerBadge letter={partnerInitial} tone="partner" />
     </View>
   );
 }
@@ -85,6 +123,8 @@ function DayCard({
   items,
   isToday,
   index,
+  meInitial,
+  partnerInitial,
   onPress,
   onRequestPress,
 }: {
@@ -93,6 +133,8 @@ function DayCard({
   selected: boolean;
   isToday: boolean;
   index: number;
+  meInitial: string;
+  partnerInitial: string;
   onPress: () => void;
   onRequestPress: (request: SharedRequest) => void;
 }) {
@@ -107,23 +149,7 @@ function DayCard({
     }).start();
   }, [appear, index]);
 
-  const mine = items.filter(
-    (i) => i.kind === 'event' && i.event.owner === 'me',
-  );
-  const partner = items.filter(
-    (i) => i.kind === 'event' && i.event.owner === 'partner',
-  );
-  const shared = items.filter(
-    (i) => i.kind === 'event' && i.event.owner === 'shared',
-  );
-  const dayRequests = items.filter((i) => i.kind === 'request');
-  const isEmpty =
-    mine.length === 0
-    && partner.length === 0
-    && shared.length === 0
-    && dayRequests.length === 0;
-
-  const showPartnerCol = partner.length > 0 || shared.length > 0 || dayRequests.length > 0;
+  const isEmpty = items.length === 0;
 
   return (
     <Animated.View
@@ -139,90 +165,49 @@ function DayCard({
         ],
       }}
     >
-      <PressableScale style={styles.dayCard} onPress={onPress} scaleTo={0.985} haptic="light">
-        <View style={styles.dayStack}>
-          <View style={styles.dayRow}>
-            <View
-              style={[
-                styles.mainBox,
-                isToday && styles.dayCardToday,
-                showPartnerCol && styles.mainBoxWithPartner,
-              ]}
-            >
-              <View style={styles.dateCol}>
-                <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
-                  {format(day, 'EEE')}
-                </Text>
-                <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
-                  {format(day, 'MMM d')}
-                </Text>
-              </View>
+      <PressableScale
+        style={[styles.mainBox, isToday && styles.dayCardToday]}
+        onPress={onPress}
+        scaleTo={0.985}
+        haptic="light"
+      >
+        <View style={styles.dateCol}>
+          <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
+            {format(day, 'EEE')}
+          </Text>
+          <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
+            {format(day, 'MMM d')}
+          </Text>
+        </View>
 
-              <View style={styles.dateDivider} />
+        <View style={styles.dateDivider} />
 
-              <View style={styles.plansCol}>
-                {isEmpty ? <Text style={styles.emptyPlans}>Free evening</Text> : null}
+        <View style={styles.plansCol}>
+          {isEmpty ? <Text style={styles.emptyPlans}>Free evening</Text> : null}
 
-                {mine.map((item) => {
-                  if (item.kind !== 'event') return null;
-                  return (
-                    <EventLines
-                      key={item.event.id}
-                      time={format(item.event.start, 'h:mm a')}
-                      title={item.event.title}
-                    />
-                  );
-                })}
-
-                {!isEmpty
-                  && mine.length === 0
-                  && shared.length === 0
-                  && dayRequests.length === 0 ? (
-                  <Text style={styles.emptyPlans}>You’re free</Text>
-                ) : null}
-              </View>
-            </View>
-
-            {showPartnerCol ? (
-              <View style={styles.partnerSide}>
-                {partner.map((item) => {
-                  if (item.kind !== 'event') return null;
-                  return (
-                    <View key={item.event.id} style={styles.partnerRow}>
-                      <EventLines
-                        time={format(item.event.start, 'h:mm a')}
-                        title={item.event.title}
-                        titleStyle={styles.partnerTitle}
-                        timeStyle={styles.partnerTime}
-                      />
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-
-          {shared.map((item) => {
-            if (item.kind !== 'event') return null;
-            const { event } = item;
-            return (
-              <View key={event.id} style={styles.togetherBlob}>
-                <View style={styles.togetherBlobInner}>
+          {items.map((item) => {
+            if (item.kind === 'event') {
+              const { event } = item;
+              const isShared = event.owner === 'shared';
+              return (
+                <View
+                  key={event.id}
+                  style={[styles.eventRow, isShared && styles.togetherBlob]}
+                >
                   <EventLines
                     time={format(event.start, 'h:mm a')}
                     title={event.title}
-                    titleStyle={styles.planTitleShared}
+                    titleStyle={isShared ? styles.planTitleShared : undefined}
                   />
-                  <View style={styles.togetherBadge}>
-                    <TogetherIcon size={14} />
-                  </View>
+                  <OwnerBadges
+                    owner={event.owner}
+                    meInitial={meInitial}
+                    partnerInitial={partnerInitial}
+                  />
                 </View>
-              </View>
-            );
-          })}
+              );
+            }
 
-          {dayRequests.map((item) => {
-            if (item.kind !== 'request') return null;
             const { request } = item;
             return (
               <Pressable
@@ -236,7 +221,14 @@ function DayCard({
                     title={request.title}
                     titleStyle={styles.requestTitle}
                   />
-                  <Text style={styles.requestPillText}>Request</Text>
+                  <View style={styles.requestMeta}>
+                    <Text style={styles.requestPillText}>Request</Text>
+                    <OwnerBadges
+                      owner="both"
+                      meInitial={meInitial}
+                      partnerInitial={partnerInitial}
+                    />
+                  </View>
                 </View>
               </Pressable>
             );
@@ -300,15 +292,6 @@ export function WeekDayCards() {
 
   return (
     <View style={styles.weekWrap}>
-      <View style={styles.colHeaders}>
-        <View style={styles.dateColSpacer} />
-        <View style={styles.colHeaderDivider} />
-        <View style={styles.colHeaderLanes}>
-          <Text style={[styles.colHeaderText, styles.colHeaderMe]}>{couple.me.name}</Text>
-          <Text style={styles.colHeaderText}>{couple.partner.name}</Text>
-        </View>
-      </View>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.weekStack}
@@ -321,6 +304,8 @@ export function WeekDayCards() {
             selected={isSameDay(day, selectedDay)}
             isToday={isSameDay(day, today)}
             index={index}
+            meInitial={couple.me.initial}
+            partnerInitial={couple.partner.initial}
             onPress={() => openDayDetail(day)}
             onRequestPress={(request) =>
               openSheet({ type: 'requestDetail', request })
@@ -494,52 +479,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 2,
   },
-  colHeaders: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingLeft: 14,
-  },
-  dateColSpacer: {
-    width: 64,
-  },
-  colHeaderDivider: {
-    width: StyleSheet.hairlineWidth,
-    marginHorizontal: 12,
-  },
-  colHeaderLanes: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  colHeaderText: {
-    flex: 1,
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 12,
-    color: colors.muted,
-    letterSpacing: 0.2,
-  },
-  colHeaderMe: {
-    flex: 1.35,
-  },
   weekStack: {
     gap: 10,
     paddingBottom: 28,
     paddingTop: 2,
   },
-  dayCard: {
-    borderRadius: 18,
-  },
-  dayStack: {
-    gap: 8,
-  },
-  dayRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 10,
-  },
   mainBox: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: colors.canvasElevated,
@@ -547,9 +492,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     minHeight: 88,
-  },
-  mainBoxWithPartner: {
-    flex: 1.35,
+    width: '100%',
   },
   dayCardToday: {
     borderWidth: 1.5,
@@ -598,6 +541,11 @@ const styles = StyleSheet.create({
     color: '#C7C7CC',
     fontStyle: 'italic',
   },
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   eventText: {
     gap: 2,
     flex: 1,
@@ -617,50 +565,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.ink,
   },
-  partnerSide: {
-    flex: 1,
+  ownerBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    gap: 8,
   },
-  partnerRow: {
-    gap: 2,
+  ownerBadgeMe: {
+    backgroundColor: colors.me,
   },
-  partnerTime: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 11,
-    color: colors.muted,
+  ownerBadgePartner: {
+    backgroundColor: colors.partner,
   },
-  partnerTitle: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 13,
-    color: colors.inkSoft,
+  ownerBadgeText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 10,
+    color: colors.white,
+    lineHeight: 12,
+  },
+  ownerBadgePair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   togetherBlob: {
     backgroundColor: colors.sharedSoft,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  togetherBlobInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   requestBox: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: colors.shared,
     borderStyle: 'dashed',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     backgroundColor: colors.sharedSoft,
   },
   requestRowInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+  },
+  requestMeta: {
+    alignItems: 'flex-end',
+    gap: 6,
   },
   requestTitle: {
     fontFamily: 'Poppins_500Medium',
@@ -671,14 +622,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_500Medium',
     fontSize: 10,
     color: colors.shared,
-  },
-  togetherBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   monthButton: {
     marginTop: 12,
