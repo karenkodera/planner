@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { addMonths, format as formatDate, isSameDay as dfIsSameDay } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  format as formatDate,
+  isSameDay as dfIsSameDay,
+  startOfWeek,
+} from 'date-fns';
 import { CalendarEvent, SharedRequest } from '../types/calendar';
 import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
@@ -25,7 +34,12 @@ import {
   isSameDay,
   isSameMonth,
   overlaps,
+  WEEK_STARTS_ON,
 } from '../utils/date';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const WEEK_PAGE_COUNT = 41;
+const WEEK_CENTER = 20;
 
 function OwnerBadge({
   letter,
@@ -256,12 +270,39 @@ export function WeekDayCards() {
     today,
     openSheet,
     couple,
+    jumpToDay,
   } = useCalendar();
   const [monthOpen, setMonthOpen] = useState(false);
   const [dayDetailOpen, setDayDetailOpen] = useState(false);
   const [detailDay, setDetailDay] = useState(selectedDay);
+  const pagerRef = useRef<ScrollView>(null);
+  const syncingFromAnchor = useRef(false);
+  const pageIndexRef = useRef(WEEK_CENTER);
 
-  const days = useMemo(() => getWeekDays(weekAnchor), [weekAnchor]);
+  const weekPages = useMemo(() => {
+    const origin = startOfWeek(today, { weekStartsOn: WEEK_STARTS_ON });
+    return Array.from({ length: WEEK_PAGE_COUNT }, (_, i) =>
+      addDays(origin, (i - WEEK_CENTER) * 7),
+    );
+  }, [today]);
+
+  const weekStart = startOfWeek(weekAnchor, { weekStartsOn: WEEK_STARTS_ON });
+  const anchorIndex = useMemo(() => {
+    const idx = weekPages.findIndex((w) => isSameDay(w, weekStart));
+    return idx >= 0 ? idx : WEEK_CENTER;
+  }, [weekPages, weekStart]);
+
+  useEffect(() => {
+    if (pageIndexRef.current === anchorIndex) return;
+    syncingFromAnchor.current = true;
+    pageIndexRef.current = anchorIndex;
+    requestAnimationFrame(() => {
+      pagerRef.current?.scrollTo({ x: SCREEN_W * anchorIndex, animated: true });
+      setTimeout(() => {
+        syncingFromAnchor.current = false;
+      }, 350);
+    });
+  }, [anchorIndex]);
 
   const itemsForDay = (day: Date): DayItem[] => {
     const dayEvents = events
@@ -297,37 +338,66 @@ export function WeekDayCards() {
     setDayDetailOpen(true);
   };
 
+  const onWeekMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (syncingFromAnchor.current) return;
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    if (idx === pageIndexRef.current) return;
+    if (!weekPages[idx]) return;
+    pageIndexRef.current = idx;
+    jumpToDay(weekPages[idx]);
+    Haptics.selectionAsync();
+  };
+
   return (
     <View style={styles.weekWrap}>
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.weekStack}
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onWeekMomentumEnd}
+        decelerationRate="fast"
+        style={styles.weekPager}
+        contentOffset={{ x: SCREEN_W * WEEK_CENTER, y: 0 }}
       >
-        {days.map((day, index) => (
-          <DayCard
-            key={day.toISOString()}
-            day={day}
-            items={itemsForDay(day)}
-            selected={isSameDay(day, selectedDay)}
-            isToday={isSameDay(day, today)}
-            index={index}
-            meInitial={couple.me.initial}
-            partnerInitial={couple.partner.initial}
-            onPress={() => openDayDetail(day)}
-            onRequestPress={(request) =>
-              openSheet({ type: 'requestDetail', request })
-            }
-          />
-        ))}
+        {weekPages.map((weekStartDay, pageIdx) => {
+          const days = getWeekDays(weekStartDay);
+          return (
+            <View key={weekStartDay.toISOString()} style={[styles.weekPage, { width: SCREEN_W }]}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.weekStack}
+                nestedScrollEnabled
+              >
+                {days.map((day, index) => (
+                  <DayCard
+                    key={day.toISOString()}
+                    day={day}
+                    items={itemsForDay(day)}
+                    selected={isSameDay(day, selectedDay)}
+                    isToday={isSameDay(day, today)}
+                    index={pageIdx === anchorIndex ? index : 0}
+                    meInitial={couple.me.initial}
+                    partnerInitial={couple.partner.initial}
+                    onPress={() => openDayDetail(day)}
+                    onRequestPress={(request) =>
+                      openSheet({ type: 'requestDetail', request })
+                    }
+                  />
+                ))}
 
-        <PressableScale
-          style={styles.monthButton}
-          onPress={() => setMonthOpen(true)}
-          haptic="light"
-        >
-          <Ionicons name="calendar-outline" size={18} color={colors.inkSoft} />
-          <Text style={styles.monthButtonText}>Calendar view</Text>
-        </PressableScale>
+                <PressableScale
+                  style={styles.monthButton}
+                  onPress={() => setMonthOpen(true)}
+                  haptic="light"
+                >
+                  <Ionicons name="calendar-outline" size={18} color={colors.inkSoft} />
+                  <Text style={styles.monthButtonText}>Calendar view</Text>
+                </PressableScale>
+              </ScrollView>
+            </View>
+          );
+        })}
       </ScrollView>
 
       <MonthViewModal
@@ -485,6 +555,14 @@ const styles = StyleSheet.create({
   weekWrap: {
     flex: 1,
     marginTop: 2,
+    marginHorizontal: -20,
+  },
+  weekPager: {
+    flex: 1,
+  },
+  weekPage: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   weekStack: {
     gap: 10,

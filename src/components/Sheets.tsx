@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
 import { useCalendar } from '../store/CalendarContext';
+import { CalendarEvent } from '../types/calendar';
 import { format, formatEventTime } from '../utils/date';
 import { slotDurationLabel } from '../utils/findTime';
 import { VOICE_DEMO_PHRASES } from '../utils/voiceParse';
@@ -64,6 +65,7 @@ export function SheetsHost() {
     <>
       <CreateEventSheet />
       <FindTimeSheet />
+      <SearchSheet />
       <RequestsSheet />
     </>
   );
@@ -217,6 +219,109 @@ function CreateEventSheet() {
             </View>
           ) : null}
         </View>
+      </ScrollView>
+    </SheetShell>
+  );
+}
+
+function SearchSheet() {
+  const { sheet, closeSheet, events, requests, jumpToDay, openSheet, couple } =
+    useCalendar();
+  const visible = sheet.type === 'search';
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (visible) setQuery('');
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const q = query.trim().toLowerCase();
+  const matchedEvents = q
+    ? events.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q)
+          || (e.location ?? '').toLowerCase().includes(q)
+          || (e.notes ?? '').toLowerCase().includes(q),
+      )
+    : [];
+  const matchedRequests = q
+    ? requests.filter(
+        (r) =>
+          r.title.toLowerCase().includes(q)
+          || (r.location ?? '').toLowerCase().includes(q)
+          || (r.notes ?? '').toLowerCase().includes(q),
+      )
+    : [];
+
+  const ownerLabel = (owner: CalendarEvent['owner']) => {
+    if (owner === 'me') return couple.me.name;
+    if (owner === 'partner') return couple.partner.name;
+    return 'Together';
+  };
+
+  return (
+    <SheetShell
+      visible
+      onClose={closeSheet}
+      title="Search"
+      subtitle="Find plans and requests"
+    >
+      <View style={styles.searchField}>
+        <Ionicons name="search" size={18} color={colors.muted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Dinner, climbing, walk…"
+          placeholderTextColor={colors.muted}
+          style={styles.searchInput}
+          autoFocus
+          clearButtonMode="while-editing"
+        />
+      </View>
+
+      <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+        {matchedEvents.map((event) => (
+          <PressableScale
+            key={event.id}
+            style={styles.requestCard}
+            onPress={() => {
+              jumpToDay(event.start);
+              closeSheet();
+            }}
+            haptic="selection"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.slotDay}>{event.title}</Text>
+              <Text style={styles.slotTime}>
+                {format(event.start, 'EEE · MMM d · h:mm a')} · {ownerLabel(event.owner)}
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </PressableScale>
+        ))}
+        {matchedRequests.map((request) => (
+          <PressableScale
+            key={request.id}
+            style={styles.requestCard}
+            onPress={() => openSheet({ type: 'requestDetail', request })}
+            haptic="selection"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.slotDay}>{request.title}</Text>
+              <Text style={styles.slotTime}>
+                {format(request.proposedStart, 'EEE · MMM d · h:mm a')} · request
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </PressableScale>
+        ))}
+        {q && !matchedEvents.length && !matchedRequests.length ? (
+          <Text style={styles.empty}>No matches for “{query.trim()}”.</Text>
+        ) : null}
+        {!q ? (
+          <Text style={styles.empty}>Start typing to search your week.</Text>
+        ) : null}
       </ScrollView>
     </SheetShell>
   );
@@ -540,6 +645,23 @@ const styles = StyleSheet.create({
   },
   createScroll: {
     maxHeight: 520,
+  },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.fill,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 15,
+    color: colors.ink,
+    padding: 0,
   },
   findTimeBlock: {
     marginTop: 18,

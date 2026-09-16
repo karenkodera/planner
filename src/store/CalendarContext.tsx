@@ -17,6 +17,7 @@ type Sheet =
   | { type: 'create' }
   | { type: 'voice' }
   | { type: 'findTime' }
+  | { type: 'search' }
   | { type: 'requests' }
   | { type: 'requestDetail'; request: SharedRequest };
 

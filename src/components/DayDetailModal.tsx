@@ -13,18 +13,24 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { addDays, format as formatDate } from 'date-fns';
+import { addDays, format as formatDate, getDay } from 'date-fns';
 import { CalendarEvent, SharedRequest } from '../types/calendar';
 import { colors } from '../theme/colors';
 import { useCalendar } from '../store/CalendarContext';
 import { eventTouchesDay, format, formatEventTime, isSameDay, overlaps } from '../utils/date';
 
-const HOUR_HEIGHT = 72;
-const DAY_START = 17;
+const HOUR_HEIGHT = 64;
+const DAY_START = 8;
 const DAY_END = 22;
+const WORK_END = 17;
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
 const TIMELINE_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT;
 const { width: SCREEN_W } = Dimensions.get('window');
+
+function isWeekday(day: Date): boolean {
+  const d = getDay(day);
+  return d >= 1 && d <= 5;
+}
 
 function minutesFromStart(date: Date): number {
   return date.getHours() * 60 + date.getMinutes() - DAY_START * 60;
@@ -35,11 +41,13 @@ function EventBlock({
   lane,
   selected,
   onPress,
+  spanning,
 }: {
   event: CalendarEvent;
-  lane: 'mine' | 'partner' | 'shared';
+  lane: 'solo' | 'shared';
   selected: boolean;
   onPress: () => void;
+  spanning?: boolean;
 }) {
   const top = Math.max(0, minutesFromStart(event.start)) * (HOUR_HEIGHT / 60);
   const durationMins = Math.max(
@@ -53,9 +61,9 @@ function EventBlock({
       onPress={onPress}
       style={[
         styles.block,
+        spanning && styles.blockSpanning,
         { top, height },
-        lane === 'mine' && styles.blockMine,
-        lane === 'partner' && styles.blockPartner,
+        lane === 'solo' && styles.blockSolo,
         lane === 'shared' && styles.blockShared,
         selected && styles.blockSelected,
       ]}
@@ -64,7 +72,6 @@ function EventBlock({
         numberOfLines={2}
         style={[
           styles.blockTitle,
-          lane === 'partner' && styles.blockTitlePartner,
           lane === 'shared' && styles.blockTitleShared,
         ]}
       >
@@ -73,7 +80,6 @@ function EventBlock({
       <Text
         style={[
           styles.blockTime,
-          lane === 'partner' && styles.blockTimePartner,
           lane === 'shared' && styles.blockTimeShared,
         ]}
       >
@@ -104,15 +110,16 @@ function RequestBlock({
       onPress={onPress}
       style={[
         styles.block,
+        styles.blockSpanning,
         styles.blockRequest,
         { top, height },
         selected && styles.blockSelected,
       ]}
     >
-      <Text numberOfLines={2} style={styles.blockTitleShared}>
+      <Text numberOfLines={2} style={styles.blockTitleRequest}>
         {request.title}
       </Text>
-      <Text style={styles.blockTimeShared}>
+      <Text style={styles.blockTimeRequest}>
         {format(request.proposedStart, 'h:mm a')} · request
       </Text>
     </Pressable>
@@ -128,6 +135,7 @@ function DayTimelinePage({
   day,
   events,
   requests,
+  coupleNames,
   selection,
   onSelectEvent,
   onSelectRequest,
@@ -135,6 +143,7 @@ function DayTimelinePage({
   day: Date;
   events: CalendarEvent[];
   requests: SharedRequest[];
+  coupleNames: { me: string; partner: string };
   selection: Selection;
   onSelectEvent: (e: CalendarEvent) => void;
   onSelectRequest: (r: SharedRequest) => void;
@@ -159,11 +168,13 @@ function DayTimelinePage({
         ? selection.request.id
         : null;
 
+  const workHeight = (WORK_END - DAY_START) * HOUR_HEIGHT;
+
   return (
     <View style={[styles.page, { width: SCREEN_W }]}>
       <View style={styles.laneLabels}>
-        <Text style={styles.laneLabelPrimary}>You</Text>
-        <Text style={styles.laneLabelPartner}>Thomas</Text>
+        <Text style={styles.laneLabel}>{coupleNames.me}</Text>
+        <Text style={styles.laneLabel}>{coupleNames.partner}</Text>
       </View>
 
       <ScrollView
@@ -185,54 +196,53 @@ function DayTimelinePage({
           })}
 
           <View style={styles.lanes}>
-            <View style={styles.laneMine}>
+            {isWeekday(day) ? (
+              <View style={[styles.workBlock, { height: workHeight }]} pointerEvents="none">
+                <Text style={styles.workBlockText}>Until 5pm</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.lane}>
               {mine.map((e) => (
                 <EventBlock
                   key={e.id}
                   event={e}
-                  lane="mine"
+                  lane="solo"
                   selected={selectedId === e.id}
                   onPress={() => onSelectEvent(e)}
-                />
-              ))}
-              {shared.map((e) => (
-                <EventBlock
-                  key={`mine-${e.id}`}
-                  event={e}
-                  lane="shared"
-                  selected={selectedId === e.id}
-                  onPress={() => onSelectEvent(e)}
-                />
-              ))}
-              {dayRequests.map((r) => (
-                <RequestBlock
-                  key={r.id}
-                  request={r}
-                  selected={selectedId === r.id}
-                  onPress={() => onSelectRequest(r)}
                 />
               ))}
             </View>
-            <View style={styles.lanePartner}>
+            <View style={styles.lane}>
               {partner.map((e) => (
                 <EventBlock
                   key={e.id}
                   event={e}
-                  lane="partner"
-                  selected={selectedId === e.id}
-                  onPress={() => onSelectEvent(e)}
-                />
-              ))}
-              {shared.map((e) => (
-                <EventBlock
-                  key={`partner-${e.id}`}
-                  event={e}
-                  lane="shared"
+                  lane="solo"
                   selected={selectedId === e.id}
                   onPress={() => onSelectEvent(e)}
                 />
               ))}
             </View>
+
+            {shared.map((e) => (
+              <EventBlock
+                key={`shared-${e.id}`}
+                event={e}
+                lane="shared"
+                spanning
+                selected={selectedId === e.id}
+                onPress={() => onSelectEvent(e)}
+              />
+            ))}
+            {dayRequests.map((r) => (
+              <RequestBlock
+                key={r.id}
+                request={r}
+                selected={selectedId === r.id}
+                onPress={() => onSelectRequest(r)}
+              />
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -278,7 +288,7 @@ function EventInfoPanel({
   const { event } = selection;
   const who =
     event.owner === 'me'
-      ? couple.me.shortName
+      ? couple.me.name
       : event.owner === 'partner'
         ? couple.partner.name
         : 'Together';
@@ -308,7 +318,7 @@ export function DayDetailModal({
   initialDay: Date;
   onClose: () => void;
 }) {
-  const { events, requests, setSelectedDay, openSheet, today } = useCalendar();
+  const { events, requests, setSelectedDay, openSheet, today, couple } = useCalendar();
   const pagerRef = useRef<ScrollView>(null);
   const [selection, setSelection] = useState<Selection>(null);
 
@@ -359,9 +369,7 @@ export function DayDetailModal({
             </Text>
             <Text style={styles.headerDate}>{format(currentDay, 'MMMM d, yyyy')}</Text>
           </View>
-          <View style={styles.swipeHint}>
-            <Ionicons name="swap-horizontal" size={16} color={colors.muted} />
-          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -379,6 +387,7 @@ export function DayDetailModal({
               day={day}
               events={events}
               requests={requests}
+              coupleNames={{ me: couple.me.name, partner: couple.partner.name }}
               selection={selection}
               onSelectEvent={(event) => {
                 setSelection({ kind: 'event', event });
@@ -408,38 +417,44 @@ const styles = StyleSheet.create({
   shell: {
     flex: 1,
     backgroundColor: colors.white,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 20,
+    gap: 8,
   },
   closeBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
+    gap: 6,
+    paddingTop: 4,
   },
   headerDow: {
     fontFamily: 'Poppins_500Medium',
-    fontSize: 13,
+    fontSize: 14,
     color: colors.muted,
+    letterSpacing: 0.2,
   },
   headerDate: {
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 18,
+    fontSize: 20,
     color: colors.ink,
     letterSpacing: -0.3,
+    lineHeight: 26,
   },
-  swipeHint: {
-    width: 40,
-    alignItems: 'center',
+  headerSpacer: {
+    width: 44,
   },
   pager: {
     flex: 1,
@@ -451,22 +466,14 @@ const styles = StyleSheet.create({
   laneLabels: {
     flexDirection: 'row',
     marginLeft: 48,
-    marginBottom: 8,
-    gap: 8,
+    marginBottom: 12,
+    gap: 10,
   },
-  laneLabelPrimary: {
-    flex: 1.35,
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 11,
-    color: colors.ink,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  laneLabelPartner: {
+  laneLabel: {
     flex: 1,
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 11,
-    color: colors.muted,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 12,
+    color: colors.inkSoft,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -499,15 +506,32 @@ const styles = StyleSheet.create({
     top: 0,
     height: TIMELINE_HEIGHT,
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
-  laneMine: {
-    flex: 1.35,
-    position: 'relative',
-  },
-  lanePartner: {
+  lane: {
     flex: 1,
     position: 'relative',
+  },
+  workBlock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    backgroundColor: 'rgba(120, 120, 128, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(120, 120, 128, 0.12)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 0,
+    opacity: 0.7,
+  },
+  workBlockText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: colors.muted,
+    fontStyle: 'italic',
   },
   block: {
     position: 'absolute',
@@ -517,24 +541,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     overflow: 'hidden',
+    zIndex: 2,
   },
-  blockMine: {
+  blockSpanning: {
+    left: 0,
+    right: 0,
+  },
+  blockSolo: {
     backgroundColor: colors.ink,
   },
-  blockPartner: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(60, 60, 67, 0.28)',
-    borderStyle: 'dashed',
-    opacity: 0.55,
-  },
   blockShared: {
-    backgroundColor: colors.sharedSoft,
+    backgroundColor: colors.shared,
   },
   blockRequest: {
-    backgroundColor: colors.fill,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    backgroundColor: colors.sharedSoft,
+    borderWidth: 1.5,
+    borderColor: colors.shared,
     borderStyle: 'dashed',
   },
   blockSelected: {
@@ -546,12 +568,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.white,
   },
-  blockTitlePartner: {
-    color: colors.inkSoft,
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 12,
-  },
   blockTitleShared: {
+    color: colors.white,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 13,
+  },
+  blockTitleRequest: {
     color: colors.ink,
     fontFamily: 'Poppins_500Medium',
     fontSize: 13,
@@ -559,14 +581,17 @@ const styles = StyleSheet.create({
   blockTime: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.72)',
     marginTop: 2,
   },
-  blockTimePartner: {
-    color: colors.muted,
-  },
   blockTimeShared: {
+    color: 'rgba(255,255,255,0.85)',
+  },
+  blockTimeRequest: {
     color: colors.inkSoft,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 11,
+    marginTop: 2,
   },
   infoPanel: {
     marginHorizontal: 16,

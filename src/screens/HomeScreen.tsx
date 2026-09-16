@@ -33,6 +33,14 @@ export function HomeScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.header}>
           <BrandMark />
+          <PressableScale
+            style={styles.searchBtn}
+            onPress={() => openSheet({ type: 'search' })}
+            haptic="selection"
+            scaleTo={0.92}
+          >
+            <Ionicons name="search" size={18} color={colors.ink} />
+          </PressableScale>
         </View>
 
         <View style={styles.actionRow}>
@@ -99,6 +107,17 @@ const styles = StyleSheet.create({
   header: {
     marginTop: 4,
     marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  searchBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionRow: {
     flexDirection: 'row',
