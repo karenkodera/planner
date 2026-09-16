@@ -18,41 +18,39 @@ export function HomeScreen() {
     <AtmosphereBackground>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.header}>
-          <View style={styles.brandBlock}>
-            <BrandMark />
-            <PressableScale
-              style={[styles.topBtn, styles.topBtnPrimary]}
-              onPress={() => openSheet({ type: 'create' })}
-              haptic="light"
-            >
-              <Ionicons name="add" size={16} color={colors.white} />
-              <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
-            </PressableScale>
-          </View>
+          <BrandMark />
+        </View>
 
-          <View style={styles.headerActions}>
-            <PressableScale
-              style={styles.topBtn}
-              onPress={() => openSheet({ type: 'findTime' })}
-              haptic="selection"
-            >
-              <Ionicons name="sparkles-outline" size={15} color={colors.ink} />
-              <Text style={styles.topBtnText}>Find time</Text>
-            </PressableScale>
-            <PressableScale
-              style={styles.topBtn}
-              onPress={() => openSheet({ type: 'requests' })}
-              haptic="selection"
-            >
-              <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
-              <Text style={styles.topBtnText}>Requests</Text>
-              {pendingCount > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingCount}</Text>
-                </View>
-              ) : null}
-            </PressableScale>
-          </View>
+        <View style={styles.actionRow}>
+          <PressableScale
+            style={styles.topBtn}
+            onPress={() => openSheet({ type: 'findTime' })}
+            haptic="selection"
+          >
+            <Ionicons name="sparkles-outline" size={15} color={colors.ink} />
+            <Text style={styles.topBtnText}>Find time</Text>
+          </PressableScale>
+          <PressableScale
+            style={styles.topBtn}
+            onPress={() => openSheet({ type: 'requests' })}
+            haptic="selection"
+          >
+            <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
+            <Text style={styles.topBtnText}>Requests</Text>
+            {pendingCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{pendingCount}</Text>
+              </View>
+            ) : null}
+          </PressableScale>
+          <PressableScale
+            style={[styles.topBtn, styles.topBtnPrimary]}
+            onPress={() => openSheet({ type: 'create' })}
+            haptic="light"
+          >
+            <Ionicons name="add" size={16} color={colors.white} />
+            <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
+          </PressableScale>
         </View>
 
         <View style={styles.weekNav}>
@@ -91,22 +89,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
     marginTop: 4,
-    marginBottom: 14,
-    gap: 12,
+    marginBottom: 10,
   },
-  brandBlock: {
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  headerActions: {
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
-    paddingTop: 4,
+    marginBottom: 12,
   },
   topBtn: {
     flexDirection: 'row',

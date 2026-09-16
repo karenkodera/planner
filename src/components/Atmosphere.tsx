@@ -20,10 +20,7 @@ export function BrandMark() {
           <Text style={styles.avatarText}>{couple.partner.initial}</Text>
         </View>
       </View>
-      <View>
-        <Text style={styles.brand}>Ours</Text>
-        <Text style={styles.brandSub}>synced</Text>
-      </View>
+      <Text style={styles.brandSub}>synced</Text>
     </View>
   );
 }
@@ -105,9 +102,8 @@ const styles = StyleSheet.create({
   },
   brandSub: {
     fontFamily: 'Poppins_400Regular',
-    fontSize: 12,
+    fontSize: 13,
     color: colors.muted,
-    marginTop: 1,
   },
   legend: {
     flexDirection: 'row',

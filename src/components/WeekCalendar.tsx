@@ -123,8 +123,7 @@ function DayCard({
     && shared.length === 0
     && dayRequests.length === 0;
 
-  const hasWrapCluster = shared.length > 0 && partner.length > 0;
-  const sharedOnly = shared.length > 0 && partner.length === 0;
+  const showPartnerCol = partner.length > 0 || shared.length > 0 || dayRequests.length > 0;
 
   return (
     <Animated.View
@@ -141,204 +140,107 @@ function DayCard({
       }}
     >
       <PressableScale style={styles.dayCard} onPress={onPress} scaleTo={0.985} haptic="light">
-        <View style={[styles.dayInner, isToday && styles.dayCardToday]}>
-          <View style={styles.dateCol}>
-            <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
-              {format(day, 'EEE')}
-            </Text>
-            <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
-              {format(day, 'MMM d')}
-            </Text>
-          </View>
-
-          <View style={styles.dateDivider} />
-
-          <View style={styles.cols}>
-            {isEmpty ? (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyPlans}>Free evening</Text>
+        <View style={styles.dayStack}>
+          <View style={styles.dayRow}>
+            <View
+              style={[
+                styles.mainBox,
+                isToday && styles.dayCardToday,
+                showPartnerCol && styles.mainBoxWithPartner,
+              ]}
+            >
+              <View style={styles.dateCol}>
+                <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
+                  {format(day, 'EEE')}
+                </Text>
+                <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
+                  {format(day, 'MMM d')}
+                </Text>
               </View>
-            ) : null}
 
-            {/* Solo plans in two columns (when not wrapped into together blob) */}
-            {!hasWrapCluster && (mine.length > 0 || partner.length > 0 || dayRequests.length > 0) ? (
-              <View style={styles.dualRow}>
-                <View style={styles.lane}>
-                  {mine.map((item) => {
-                    if (item.kind !== 'event') return null;
-                    return (
+              <View style={styles.dateDivider} />
+
+              <View style={styles.plansCol}>
+                {isEmpty ? <Text style={styles.emptyPlans}>Free evening</Text> : null}
+
+                {mine.map((item) => {
+                  if (item.kind !== 'event') return null;
+                  return (
+                    <EventLines
+                      key={item.event.id}
+                      time={format(item.event.start, 'h:mm a')}
+                      title={item.event.title}
+                    />
+                  );
+                })}
+
+                {!isEmpty
+                  && mine.length === 0
+                  && shared.length === 0
+                  && dayRequests.length === 0 ? (
+                  <Text style={styles.emptyPlans}>You’re free</Text>
+                ) : null}
+              </View>
+            </View>
+
+            {showPartnerCol ? (
+              <View style={styles.partnerSide}>
+                {partner.map((item) => {
+                  if (item.kind !== 'event') return null;
+                  return (
+                    <View key={item.event.id} style={styles.partnerRow}>
                       <EventLines
-                        key={item.event.id}
-                        time={format(item.event.start, 'h:mm a')}
-                        title={item.event.title}
-                      />
-                    );
-                  })}
-                  {dayRequests.map((item) => {
-                    if (item.kind !== 'request') return null;
-                    const { request } = item;
-                    return (
-                      <Pressable
-                        key={`req-${request.id}`}
-                        onPress={() => onRequestPress(request)}
-                        style={styles.requestBox}
-                      >
-                        <EventLines
-                          time={format(request.proposedStart, 'h:mm a')}
-                          title={request.title}
-                          titleStyle={styles.requestTitle}
-                        />
-                        <Text style={styles.requestPillText}>Request</Text>
-                      </Pressable>
-                    );
-                  })}
-                  {mine.length === 0 && dayRequests.length === 0 && !sharedOnly ? (
-                    <Text style={styles.emptyPlans}>You’re free</Text>
-                  ) : null}
-                </View>
-                <View style={styles.lane}>
-                  {partner.map((item) => {
-                    if (item.kind !== 'event') return null;
-                    return (
-                      <EventLines
-                        key={item.event.id}
                         time={format(item.event.start, 'h:mm a')}
                         title={item.event.title}
                         titleStyle={styles.partnerTitle}
                         timeStyle={styles.partnerTime}
                       />
-                    );
-                  })}
-                </View>
-              </View>
-            ) : null}
-
-            {/* Shared alone — one spanning blob across both columns */}
-            {sharedOnly
-              ? shared.map((item) => {
-                  if (item.kind !== 'event') return null;
-                  const { event } = item;
-                  return (
-                    <View key={event.id} style={styles.togetherBlob}>
-                      <View style={styles.togetherBlobInner}>
-                        <EventLines
-                          time={format(event.start, 'h:mm a')}
-                          title={event.title}
-                          titleStyle={styles.planTitleShared}
-                        />
-                        <View style={styles.togetherBadge}>
-                          <TogetherIcon size={14} />
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })
-              : null}
-
-            {/* Shared + partner — melted blob wrapping around partner events */}
-            {hasWrapCluster ? (
-              <View style={styles.togetherWrap}>
-                <View
-                  style={[
-                    styles.wrapTop,
-                    mine.length === 0 && dayRequests.length === 0 && styles.wrapTopPartnerOnly,
-                  ]}
-                >
-                  {mine.length > 0 || dayRequests.length > 0 ? (
-                    <View style={styles.wrapLeft}>
-                      {mine.map((item) => {
-                        if (item.kind !== 'event') return null;
-                        return (
-                          <EventLines
-                            key={item.event.id}
-                            time={format(item.event.start, 'h:mm a')}
-                            title={item.event.title}
-                          />
-                        );
-                      })}
-                      {dayRequests.map((item) => {
-                        if (item.kind !== 'request') return null;
-                        const { request } = item;
-                        return (
-                          <Pressable
-                            key={`req-${request.id}`}
-                            onPress={() => onRequestPress(request)}
-                            style={styles.requestBox}
-                          >
-                            <EventLines
-                              time={format(request.proposedStart, 'h:mm a')}
-                              title={request.title}
-                              titleStyle={styles.requestTitle}
-                            />
-                            <Text style={styles.requestPillText}>Request</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <View style={styles.wrapLeftSpacer} />
-                  )}
-                  <View style={styles.wrapIsland}>
-                    {partner.map((item) => {
-                      if (item.kind !== 'event') return null;
-                      return (
-                        <EventLines
-                          key={item.event.id}
-                          time={format(item.event.start, 'h:mm a')}
-                          title={item.event.title}
-                          titleStyle={styles.partnerTitle}
-                          timeStyle={styles.partnerTime}
-                        />
-                      );
-                    })}
-                  </View>
-                </View>
-                {shared.map((item) => {
-                  if (item.kind !== 'event') return null;
-                  const { event } = item;
-                  return (
-                    <View key={event.id} style={styles.wrapSharedRow}>
-                      <EventLines
-                        time={format(event.start, 'h:mm a')}
-                        title={event.title}
-                        titleStyle={styles.planTitleShared}
-                      />
-                      <View style={styles.togetherBadge}>
-                        <TogetherIcon size={14} />
-                      </View>
                     </View>
                   );
                 })}
               </View>
             ) : null}
-
-            {/* Shared-only day still needs requests under blob */}
-            {sharedOnly && dayRequests.length > 0 ? (
-              <View style={styles.dualRow}>
-                <View style={styles.lane}>
-                  {dayRequests.map((item) => {
-                    if (item.kind !== 'request') return null;
-                    const { request } = item;
-                    return (
-                      <Pressable
-                        key={`req-${request.id}`}
-                        onPress={() => onRequestPress(request)}
-                        style={styles.requestBox}
-                      >
-                        <EventLines
-                          time={format(request.proposedStart, 'h:mm a')}
-                          title={request.title}
-                          titleStyle={styles.requestTitle}
-                        />
-                        <Text style={styles.requestPillText}>Request</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <View style={styles.lane} />
-              </View>
-            ) : null}
           </View>
+
+          {shared.map((item) => {
+            if (item.kind !== 'event') return null;
+            const { event } = item;
+            return (
+              <View key={event.id} style={styles.togetherBlob}>
+                <View style={styles.togetherBlobInner}>
+                  <EventLines
+                    time={format(event.start, 'h:mm a')}
+                    title={event.title}
+                    titleStyle={styles.planTitleShared}
+                  />
+                  <View style={styles.togetherBadge}>
+                    <TogetherIcon size={14} />
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          {dayRequests.map((item) => {
+            if (item.kind !== 'request') return null;
+            const { request } = item;
+            return (
+              <Pressable
+                key={`req-${request.id}`}
+                onPress={() => onRequestPress(request)}
+                style={styles.requestBox}
+              >
+                <View style={styles.requestRowInner}>
+                  <EventLines
+                    time={format(request.proposedStart, 'h:mm a')}
+                    title={request.title}
+                    titleStyle={styles.requestTitle}
+                  />
+                  <Text style={styles.requestPillText}>Request</Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       </PressableScale>
     </Animated.View>
@@ -402,7 +304,7 @@ export function WeekDayCards() {
         <View style={styles.dateColSpacer} />
         <View style={styles.colHeaderDivider} />
         <View style={styles.colHeaderLanes}>
-          <Text style={styles.colHeaderText}>{couple.me.name}</Text>
+          <Text style={[styles.colHeaderText, styles.colHeaderMe]}>{couple.me.name}</Text>
           <Text style={styles.colHeaderText}>{couple.partner.name}</Text>
         </View>
       </View>
@@ -596,7 +498,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    paddingHorizontal: 14,
+    paddingLeft: 14,
   },
   dateColSpacer: {
     width: 64,
@@ -617,6 +519,9 @@ const styles = StyleSheet.create({
     color: colors.muted,
     letterSpacing: 0.2,
   },
+  colHeaderMe: {
+    flex: 1.35,
+  },
   weekStack: {
     gap: 10,
     paddingBottom: 28,
@@ -625,7 +530,16 @@ const styles = StyleSheet.create({
   dayCard: {
     borderRadius: 18,
   },
-  dayInner: {
+  dayStack: {
+    gap: 8,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+  },
+  mainBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: colors.canvasElevated,
@@ -633,6 +547,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     minHeight: 88,
+  },
+  mainBoxWithPartner: {
+    flex: 1.35,
   },
   dayCardToday: {
     borderWidth: 1.5,
@@ -670,22 +587,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     alignSelf: 'stretch',
   },
-  cols: {
+  plansCol: {
     flex: 1,
-    gap: 8,
     justifyContent: 'center',
-  },
-  emptyWrap: {
-    paddingVertical: 4,
-  },
-  dualRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  lane: {
-    flex: 1,
     gap: 8,
-    justifyContent: 'center',
   },
   emptyPlans: {
     fontFamily: 'Poppins_400Regular',
@@ -712,6 +617,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.ink,
   },
+  partnerSide: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  partnerRow: {
+    gap: 2,
+  },
   partnerTime: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
@@ -725,59 +640,27 @@ const styles = StyleSheet.create({
   togetherBlob: {
     backgroundColor: colors.sharedSoft,
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   togetherBlobInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  togetherWrap: {
+  requestBox: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.shared,
+    borderStyle: 'dashed',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: colors.sharedSoft,
-    borderRadius: 16,
-    padding: 10,
-    gap: 8,
   },
-  wrapTop: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'stretch',
-  },
-  wrapTopPartnerOnly: {
-    justifyContent: 'flex-end',
-  },
-  wrapLeft: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  wrapLeftSpacer: {
-    flex: 1,
-  },
-  wrapIsland: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  wrapSharedRow: {
+  requestRowInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 4,
-    paddingBottom: 2,
-  },
-  requestBox: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(60, 60, 67, 0.35)',
-    borderStyle: 'dashed',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: 'transparent',
-    gap: 4,
   },
   requestTitle: {
     fontFamily: 'Poppins_500Medium',
@@ -787,7 +670,7 @@ const styles = StyleSheet.create({
   requestPillText: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 10,
-    color: colors.muted,
+    color: colors.shared,
   },
   togetherBadge: {
     width: 28,
