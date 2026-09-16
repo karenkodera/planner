@@ -32,6 +32,7 @@ type CalendarContextValue = {
   selectedDay: Date;
   setSelectedDay: (d: Date) => void;
   goWeek: (delta: number) => void;
+  jumpToDay: (d: Date) => void;
   openSheet: (sheet: Sheet) => void;
   closeSheet: () => void;
   addEvent: (event: Omit<CalendarEvent, 'id'>) => void;
@@ -80,6 +81,11 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const jumpToDay = useCallback((d: Date) => {
+    setWeekAnchor(d);
+    setSelectedDay(d);
+  }, []);
+
   const addEvent = useCallback((event: Omit<CalendarEvent, 'id'>) => {
     const full: CalendarEvent = { ...event, id: uid('e') };
     setEvents((prev) => [...prev, full]);
@@ -107,7 +113,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         start: parsed.start,
         end: parsed.end,
         owner: 'me',
-        notes: 'Waiting on Alex',
+        notes: 'Waiting on Thomas',
       };
       setEvents((prev) => [...prev, event]);
       return event;
@@ -235,6 +241,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     selectedDay,
     setSelectedDay,
     goWeek,
+    jumpToDay,
     openSheet: setSheet,
     closeSheet: () => setSheet({ type: 'none' }),
     addEvent,

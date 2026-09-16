@@ -9,16 +9,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
 import { useCalendar } from '../store/CalendarContext';
-import { formatEventTime } from '../utils/date';
+import { format, formatEventTime } from '../utils/date';
 import { slotDurationLabel } from '../utils/findTime';
-import { VOICE_DEMO_PHRASES, parseNaturalEvent } from '../utils/voiceParse';
-import { atTime, format } from '../utils/date';
-import { EventOwner } from '../types/calendar';
+import { VOICE_DEMO_PHRASES } from '../utils/voiceParse';
 
 function SheetShell({
   visible,
@@ -33,16 +31,29 @@ function SheetShell({
   title: string;
   subtitle?: string;
 }) {
+  const slide = useRef(new Animated.Value(520)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    slide.setValue(520);
+    Animated.spring(slide, {
+      toValue: 0,
+      damping: 22,
+      stiffness: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, slide]);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.sheet}>
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }] }]}>
           <View style={styles.handle} />
           <Text style={styles.sheetTitle}>{title}</Text>
           {subtitle ? <Text style={styles.sheetSub}>{subtitle}</Text> : null}
           {children}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -51,158 +62,24 @@ function SheetShell({
 export function SheetsHost() {
   return (
     <>
-      <EventDetailSheet />
       <CreateEventSheet />
-      <VoiceSheet />
       <FindTimeSheet />
       <RequestsSheet />
     </>
   );
 }
 
-function EventDetailSheet() {
-  const { sheet, closeSheet, couple } = useCalendar();
-  if (sheet.type !== 'event') return null;
-  const { event } = sheet;
-  const ownerLabel =
-    event.owner === 'me'
-      ? couple.me.shortName
-      : event.owner === 'partner'
-        ? couple.partner.name
-        : 'Together';
-
-  return (
-    <SheetShell
-      visible
-      onClose={closeSheet}
-      title={event.title}
-      subtitle={`${ownerLabel} · ${format(event.start, 'EEE, MMM d')}`}
-    >
-      <Text style={styles.detailTime}>{formatEventTime(event.start, event.end)}</Text>
-      {event.location ? <Text style={styles.detailMeta}>{event.location}</Text> : null}
-      {event.notes ? <Text style={styles.detailNotes}>{event.notes}</Text> : null}
-      <Pressable style={styles.primaryBtn} onPress={closeSheet}>
-        <Text style={styles.primaryBtnText}>Close</Text>
-      </Pressable>
-    </SheetShell>
-  );
-}
-
 function CreateEventSheet() {
-  const { sheet, closeSheet, addEvent, sendSharedRequest, selectedDay } = useCalendar();
-  const visible = sheet.type === 'create';
-  const [title, setTitle] = useState('');
-  const [owner, setOwner] = useState<EventOwner>('me');
-  const [hour, setHour] = useState(18);
-
-  useEffect(() => {
-    if (visible) {
-      setTitle('');
-      setOwner('me');
-      setHour(18);
-    }
-  }, [visible]);
-
-  if (!visible) return null;
-
-  const start = atTime(selectedDay, hour, 0);
-  const end = atTime(selectedDay, hour + (owner === 'shared' ? 2 : 1), 0);
-
-  const submit = () => {
-    if (!title.trim()) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (owner === 'shared') {
-      sendSharedRequest({
-        title: title.trim(),
-        start,
-        end,
-      });
-      addEvent({
-        title: `${title.trim()} (requested)`,
-        start,
-        end,
-        owner: 'me',
-        notes: 'Waiting on Alex',
-      });
-    } else {
-      addEvent({ title: title.trim(), start, end, owner });
-    }
-    closeSheet();
-  };
-
-  return (
-    <SheetShell
-      visible
-      onClose={closeSheet}
-      title="New plan"
-      subtitle={format(selectedDay, 'EEEE, MMMM d')}
-    >
-      <TextInput
-        value={title}
-        onChangeText={setTitle}
-        placeholder="What are you planning?"
-        placeholderTextColor={colors.muted}
-        style={styles.input}
-      />
-
-      <Text style={styles.fieldLabel}>Who is this for?</Text>
-      <View style={styles.segment}>
-        {(
-          [
-            { id: 'me', label: 'Just you' },
-            { id: 'shared', label: 'Ask Alex' },
-          ] as const
-        ).map((opt) => (
-          <Pressable
-            key={opt.id}
-            onPress={() => setOwner(opt.id)}
-            style={[styles.segmentItem, owner === opt.id && styles.segmentItemOn]}
-          >
-            <Text style={[styles.segmentText, owner === opt.id && styles.segmentTextOn]}>
-              {opt.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={styles.fieldLabel}>Starts around</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hourScroll}>
-        {[9, 12, 15, 17, 18, 19, 20].map((h) => (
-          <Pressable
-            key={h}
-            onPress={() => setHour(h)}
-            style={[styles.chipBtn, hour === h && styles.chipBtnOn]}
-          >
-            <Text style={[styles.chipBtnText, hour === h && styles.chipBtnTextOn]}>
-              {format(atTime(selectedDay, h), 'h a')}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <Pressable style={styles.primaryBtn} onPress={submit}>
-        <Text style={styles.primaryBtnText}>
-          {owner === 'shared' ? 'Send request' : 'Add to your week'}
-        </Text>
-      </Pressable>
-    </SheetShell>
-  );
-}
-
-function VoiceSheet() {
   const { sheet, closeSheet, addFromVoice } = useCalendar();
-  const visible = sheet.type === 'voice';
+  const visible = sheet.type === 'create';
+  const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [preview, setPreview] = useState<ReturnType<typeof parseNaturalEvent> | null>(null);
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (!visible) {
+    if (visible) {
+      setText('');
       setListening(false);
-      setTranscript('');
-      setPreview(null);
-      return;
     }
   }, [visible]);
 
@@ -213,8 +90,8 @@ function VoiceSheet() {
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.12, duration: 650, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
       ]),
     );
     loop.start();
@@ -223,84 +100,64 @@ function VoiceSheet() {
 
   if (!visible) return null;
 
-  const startListening = async () => {
+  const startListening = () => {
     setListening(true);
-    setTranscript('');
-    setPreview(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Mock speech recognition with a realistic delay + phrase
     const phrase =
       VOICE_DEMO_PHRASES[Math.floor(Math.random() * VOICE_DEMO_PHRASES.length)];
     setTimeout(() => {
-      setTranscript(phrase);
-      setPreview(parseNaturalEvent(phrase));
+      setText(phrase);
       setListening(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, 1600);
+    }, 1400);
   };
 
-  const confirm = () => {
-    if (!transcript) return;
-    addFromVoice(transcript);
+  const submit = () => {
+    if (!text.trim()) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    addFromVoice(text.trim());
     closeSheet();
   };
 
   return (
-    <SheetShell
-      visible
-      onClose={closeSheet}
-      title="Speak a plan"
-      subtitle="Describe it like a text to a friend"
-    >
-      <View style={styles.voiceStage}>
+    <SheetShell visible onClose={closeSheet} title="New event">
+      <View style={styles.composeRow}>
+        <TextInput
+          value={text}
+          onChangeText={setText}
+          placeholder="Tell us what you’re doing at what time on what date with who and we’ll put it in the calendar."
+          placeholderTextColor={colors.muted}
+          style={styles.composeInput}
+          multiline
+          textAlignVertical="top"
+        />
         <Animated.View style={{ transform: [{ scale: pulse }] }}>
           <Pressable
             onPress={startListening}
-            style={[styles.mic, listening && styles.micOn]}
+            style={[styles.micBtn, listening && styles.micBtnOn]}
+            accessibilityLabel="Dictate with microphone"
           >
-            <Text style={[styles.micGlyph, listening && styles.micGlyphOn]}>
-              {listening ? '•••' : 'mic'}
-            </Text>
+            <Ionicons
+              name={listening ? 'mic' : 'mic-outline'}
+              size={22}
+              color={listening ? colors.white : colors.ink}
+            />
           </Pressable>
         </Animated.View>
-        <Text style={styles.voiceHint}>
-          {listening ? 'Listening…' : transcript ? 'Got it' : 'Tap to talk'}
-        </Text>
-        {transcript ? <Text style={styles.transcript}>“{transcript}”</Text> : null}
-        {preview ? (
-          <View style={styles.previewCard}>
-            <Text style={styles.previewTitle}>{preview.title}</Text>
-            <Text style={styles.previewMeta}>
-              {format(preview.start, 'EEE h:mm a')} ·{' '}
-              {preview.owner === 'shared' ? 'Shared request' : 'Your calendar'}
-            </Text>
-            <Text style={styles.previewNote}>{preview.confidenceNote}</Text>
-          </View>
-        ) : null}
       </View>
 
-      <Text style={styles.fieldLabel}>Or try a phrase</Text>
-      <View style={styles.phraseWrap}>
-        {VOICE_DEMO_PHRASES.map((p) => (
-          <Pressable
-            key={p}
-            style={styles.phraseChip}
-            onPress={() => {
-              setTranscript(p);
-              setPreview(parseNaturalEvent(p));
-            }}
-          >
-            <Text style={styles.phraseText}>{p}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <Text style={styles.composeHint}>
+        {listening
+          ? 'Listening…'
+          : 'Type it out, or tap the mic and say it.'}
+      </Text>
 
       <Pressable
-        style={[styles.primaryBtn, !transcript && styles.btnDisabled]}
-        onPress={confirm}
-        disabled={!transcript}
+        style={[styles.primaryBtn, !text.trim() && styles.btnDisabled]}
+        onPress={submit}
+        disabled={!text.trim()}
       >
-        <Text style={styles.primaryBtnText}>Add this</Text>
+        <Text style={styles.primaryBtnText}>Add to calendar</Text>
       </Pressable>
     </SheetShell>
   );
@@ -309,11 +166,6 @@ function VoiceSheet() {
 function FindTimeSheet() {
   const { sheet, closeSheet, freeSlots, createFromSlot } = useCalendar();
   const visible = sheet.type === 'findTime';
-  const [title, setTitle] = useState('Time together');
-
-  useEffect(() => {
-    if (visible) setTitle('Time together');
-  }, [visible]);
 
   if (!visible) return null;
 
@@ -324,21 +176,14 @@ function FindTimeSheet() {
       title="Find time together"
       subtitle="Open windows when you’re both free"
     >
-      <TextInput
-        value={title}
-        onChangeText={setTitle}
-        placeholder="What should we do?"
-        placeholderTextColor={colors.muted}
-        style={styles.input}
-      />
-      <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
         {freeSlots.map((slot) => (
           <Pressable
             key={slot.id}
             style={styles.slotCard}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              createFromSlot(slot, title.trim() || 'Time together');
+              createFromSlot(slot, 'Time together');
               closeSheet();
             }}
           >
@@ -473,63 +318,11 @@ function RequestsSheet() {
   );
 }
 
-export function ActionDock() {
-  const { openSheet, pendingCount } = useCalendar();
-  return (
-    <View style={styles.dockWrap}>
-      <BlurView intensity={40} tint="light" style={styles.dock}>
-        <DockButton label="Add" onPress={() => openSheet({ type: 'create' })} glyph="＋" />
-        <DockButton label="Voice" onPress={() => openSheet({ type: 'voice' })} glyph="◌" />
-        <DockButton
-          label="Find time"
-          onPress={() => openSheet({ type: 'findTime' })}
-          glyph="◎"
-          emphasize
-        />
-        <DockButton
-          label="Requests"
-          onPress={() => openSheet({ type: 'requests' })}
-          glyph="↔"
-          badge={pendingCount}
-        />
-      </BlurView>
-    </View>
-  );
-}
-
-function DockButton({
-  label,
-  glyph,
-  onPress,
-  badge,
-  emphasize,
-}: {
-  label: string;
-  glyph: string;
-  onPress: () => void;
-  badge?: number;
-  emphasize?: boolean;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[styles.dockBtn, emphasize && styles.dockBtnEmph]}>
-      <View>
-        <Text style={[styles.dockGlyph, emphasize && styles.dockGlyphEmph]}>{glyph}</Text>
-        {badge ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={[styles.dockLabel, emphasize && styles.dockLabelEmph]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(27, 36, 32, 0.28)',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
   },
   sheet: {
     backgroundColor: colors.glassStrong,
@@ -545,7 +338,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.line,
+    backgroundColor: colors.fillStrong,
     marginBottom: 14,
   },
   sheetTitle: {
@@ -575,7 +368,7 @@ const styles = StyleSheet.create({
   },
   input: {
     ...type.body,
-    backgroundColor: colors.white,
+    backgroundColor: colors.canvasElevated,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -584,8 +377,49 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginBottom: 16,
   },
+  composeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  composeInput: {
+    flex: 1,
+    minHeight: 140,
+    ...type.body,
+    backgroundColor: colors.canvasElevated,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    color: colors.ink,
+  },
+  micBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  micBtnOn: {
+    backgroundColor: colors.accent,
+  },
+  composeHint: {
+    ...type.caption,
+    color: colors.muted,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  btnDisabled: {
+    opacity: 0.4,
+  },
   fieldLabel: {
-    ...type.micro,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
     color: colors.muted,
     marginBottom: 8,
   },
@@ -635,7 +469,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: 18,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
     borderRadius: 18,
     paddingVertical: 16,
     alignItems: 'center',
@@ -663,92 +497,17 @@ const styles = StyleSheet.create({
     ...type.bodyMedium,
     color: colors.muted,
   },
-  btnDisabled: {
-    opacity: 0.4,
-  },
-  voiceStage: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 10,
-  },
-  mic: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.meSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(196, 92, 74, 0.25)',
-  },
-  micOn: {
-    backgroundColor: colors.me,
-  },
-  micGlyph: {
-    fontFamily: 'DMSans_700Bold',
-    fontSize: 16,
-    letterSpacing: 1,
-    color: colors.meDeep,
-    textTransform: 'uppercase',
-  },
-  micGlyphOn: {
-    color: colors.white,
-  },
-  voiceHint: {
-    ...type.caption,
-    color: colors.muted,
-  },
-  transcript: {
-    ...type.subtitle,
-    color: colors.ink,
-    textAlign: 'center',
-    paddingHorizontal: 12,
-  },
-  previewCard: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.line,
-    marginTop: 4,
-  },
-  previewTitle: {
-    ...type.bodyMedium,
-    color: colors.ink,
-    fontSize: 17,
-  },
-  previewMeta: {
-    ...type.caption,
-    color: colors.muted,
-    marginTop: 4,
-  },
   previewNote: {
     ...type.body,
     color: colors.partnerDeep,
     marginTop: 8,
     fontSize: 13,
   },
-  phraseWrap: {
-    gap: 8,
-    marginBottom: 4,
-  },
-  phraseChip: {
-    backgroundColor: colors.mist,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  phraseText: {
-    ...type.body,
-    color: colors.inkSoft,
-    fontSize: 14,
-  },
   slotCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.white,
+    backgroundColor: colors.canvasElevated,
     borderRadius: 18,
     padding: 16,
     marginBottom: 10,
@@ -784,7 +543,7 @@ const styles = StyleSheet.create({
   requestCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.canvasElevated,
     borderRadius: 18,
     padding: 16,
     marginBottom: 10,
@@ -800,63 +559,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 18,
-  },
-  dockWrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
-  },
-  dock: {
-    flexDirection: 'row',
-    borderRadius: 24,
-    overflow: 'hidden',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  dockBtn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-  },
-  dockBtnEmph: {
-    backgroundColor: colors.ink,
-    borderRadius: 18,
-  },
-  dockGlyph: {
-    fontSize: 18,
-    color: colors.ink,
-  },
-  dockGlyphEmph: {
-    color: colors.white,
-  },
-  dockLabel: {
-    ...type.micro,
-    color: colors.muted,
-    fontSize: 9,
-  },
-  dockLabelEmph: {
-    color: 'rgba(255,255,255,0.85)',
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.me,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: colors.white,
-    fontSize: 10,
-    fontFamily: 'DMSans_700Bold',
   },
 });

@@ -11,11 +11,18 @@ import {
   slotDurationLabel,
 } from '../utils/date';
 
-const DAY_START = 8;
-const DAY_END = 21;
+const WEEKDAY_START = 17; // 5pm — after work
+const WEEKEND_START = 10;
+const DAY_END = 22;
 const MIN_SLOT = 45;
 
 type BusyInterval = { start: Date; end: Date };
+
+function dayWindowStart(day: Date): Date {
+  const dow = day.getDay(); // 0 Sun … 6 Sat
+  const isWeekend = dow === 0 || dow === 6;
+  return atTime(day, isWeekend ? WEEKEND_START : WEEKDAY_START);
+}
 
 function busyForPerson(
   events: CalendarEvent[],
@@ -44,7 +51,7 @@ function mergeIntervals(intervals: BusyInterval[]): BusyInterval[] {
 }
 
 function freeGaps(busy: BusyInterval[], day: Date): BusyInterval[] {
-  const windowStart = atTime(day, DAY_START);
+  const windowStart = dayWindowStart(day);
   const windowEnd = atTime(day, DAY_END);
   const merged = mergeIntervals(
     busy.filter((b) => overlaps(b.start, b.end, windowStart, windowEnd)),

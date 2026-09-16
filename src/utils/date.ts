@@ -4,14 +4,17 @@ import {
   differenceInMinutes,
   eachDayOfInterval,
   endOfDay,
+  endOfMonth,
   format,
   isSameDay,
+  isSameMonth,
   isWithinInterval,
   max,
   min,
   setHours,
   setMinutes,
   startOfDay,
+  startOfMonth,
   startOfWeek,
 } from 'date-fns';
 
@@ -22,8 +25,23 @@ export function getWeekDays(anchor: Date): Date[] {
   return eachDayOfInterval({ start, end: addDays(start, 6) });
 }
 
-export function weekLabel(anchor: Date): string {
+/** Full calendar grid (Mon–Sun) covering the month of `anchor`. */
+export function getMonthGrid(anchor: Date): Date[] {
+  const monthStart = startOfMonth(anchor);
+  const monthEnd = endOfMonth(anchor);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: WEEK_STARTS_ON });
+  const gridEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: WEEK_STARTS_ON }), 6);
+  return eachDayOfInterval({ start: gridStart, end: gridEnd });
+}
+
+export { isSameMonth, startOfMonth, endOfMonth };
+
+export function weekLabel(anchor: Date, today: Date = new Date()): string {
   const days = getWeekDays(anchor);
+  const todayWeek = getWeekDays(today);
+  if (isSameDay(days[0], todayWeek[0])) {
+    return 'This week';
+  }
   const start = days[0];
   const end = days[6];
   if (start.getMonth() === end.getMonth()) {

@@ -56,10 +56,9 @@ function resolveTime(text: string): { hour: number; minute: number } {
   const lower = text.toLowerCase();
   const match = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
   if (!match) {
-    if (lower.includes('noon')) return { hour: 12, minute: 0 };
-    if (lower.includes('evening') || lower.includes('dinner')) return { hour: 19, minute: 0 };
-    if (lower.includes('lunch')) return { hour: 12, minute: 30 };
-    if (lower.includes('morning')) return { hour: 9, minute: 0 };
+    if (lower.includes('evening') || lower.includes('dinner') || lower.includes('date')) {
+      return { hour: 19, minute: 0 };
+    }
     return { hour: 18, minute: 0 };
   }
   let hour = parseInt(match[1], 10);
@@ -67,7 +66,9 @@ function resolveTime(text: string): { hour: number; minute: number } {
   const meridiem = match[3];
   if (meridiem === 'pm' && hour < 12) hour += 12;
   if (meridiem === 'am' && hour === 12) hour = 0;
-  if (!meridiem && hour < 8) hour += 12;
+  if (!meridiem && hour < 12) hour += 12;
+  // Weeknight default: bump anything before 5pm to 5pm
+  if (hour < 17) hour = 17;
   return { hour, minute };
 }
 
@@ -86,11 +87,12 @@ function resolveOwner(text: string): EventOwner {
   const lower = text.toLowerCase();
   if (
     lower.includes('together')
-    || lower.includes('with alex')
+    || lower.includes('with thomas')
     || lower.includes('with us')
     || lower.includes('date')
     || lower.includes('shared')
     || lower.includes('both')
+    || lower.includes('with alex')
   ) {
     return 'shared';
   }
@@ -131,14 +133,14 @@ export function parseNaturalEvent(
     end,
     confidenceNote:
       owner === 'shared'
-        ? 'Heard as a shared plan — Alex will see a request.'
+        ? 'Heard as a shared plan — Thomas will see a request.'
         : 'Added to your calendar.',
   };
 }
 
 export const VOICE_DEMO_PHRASES = [
-  'Dinner with Alex Friday at 7',
-  'Yoga tomorrow morning at 8',
-  'Coffee with Maya Wednesday at 10am',
-  'Date night Saturday at 8pm for 2 hours',
+  'Dinner with Thomas Friday at 7',
+  'Climbing Wednesday at 6:30',
+  'Date night Saturday at 8pm',
+  'Yoga Thursday at 6pm',
 ];
