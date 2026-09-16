@@ -1,7 +1,8 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { AtmosphereBackground, BrandMark } from '../components/Atmosphere';
 import { PressableScale } from '../components/PressableScale';
 import { WeekDayCards } from '../components/WeekCalendar';
@@ -12,7 +13,20 @@ import { type } from '../theme/typography';
 import { weekLabel } from '../utils/date';
 
 export function HomeScreen() {
-  const { weekAnchor, goWeek, openSheet, pendingCount, today } = useCalendar();
+  const { weekAnchor, goWeek, jumpToDay, openSheet, pendingCount, today } =
+    useCalendar();
+  const lastWeekTap = useRef(0);
+
+  const onWeekLabelPress = () => {
+    const now = Date.now();
+    if (now - lastWeekTap.current < 320) {
+      jumpToDay(today);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      lastWeekTap.current = 0;
+      return;
+    }
+    lastWeekTap.current = now;
+  };
 
   return (
     <AtmosphereBackground>
@@ -22,14 +36,6 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.actionRow}>
-          <PressableScale
-            style={styles.topBtn}
-            onPress={() => openSheet({ type: 'findTime' })}
-            haptic="selection"
-          >
-            <Ionicons name="sparkles-outline" size={15} color={colors.ink} />
-            <Text style={styles.topBtnText}>Find time</Text>
-          </PressableScale>
           <PressableScale
             style={styles.topBtn}
             onPress={() => openSheet({ type: 'requests' })}
@@ -63,7 +69,9 @@ export function HomeScreen() {
           >
             <Ionicons name="chevron-back" size={18} color={colors.ink} />
           </PressableScale>
-          <Text style={styles.weekLabel}>{weekLabel(weekAnchor, today)}</Text>
+          <Pressable onPress={onWeekLabelPress} style={styles.weekLabelHit}>
+            <Text style={styles.weekLabel}>{weekLabel(weekAnchor, today)}</Text>
+          </Pressable>
           <PressableScale
             onPress={() => goWeek(1)}
             hitSlop={12}
@@ -95,7 +103,6 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 12,
   },
@@ -144,13 +151,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     width: '100%',
   },
+  weekLabelHit: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
   weekLabel: {
     ...type.caption,
     color: colors.inkSoft,
     textAlign: 'center',
     fontFamily: 'Poppins_500Medium',
     fontSize: 13,
-    flex: 1,
   },
   navBtn: {
     width: 34,

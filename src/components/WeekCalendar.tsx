@@ -32,13 +32,15 @@ function OwnerBadge({
   tone,
 }: {
   letter: string;
-  tone: 'me' | 'partner';
+  tone: 'me' | 'partner' | 'shared';
 }) {
   return (
     <View
       style={[
         styles.ownerBadge,
-        tone === 'me' ? styles.ownerBadgeMe : styles.ownerBadgePartner,
+        tone === 'me' && styles.ownerBadgeMe,
+        tone === 'partner' && styles.ownerBadgePartner,
+        tone === 'shared' && styles.ownerBadgeShared,
       ]}
     >
       <Text style={styles.ownerBadgeText}>{letter}</Text>
@@ -86,9 +88,14 @@ function OwnerBadges({
     return <OwnerBadge letter={partnerInitial} tone="partner" />;
   }
   return (
-    <View style={styles.ownerBadgePair}>
-      <OwnerBadge letter={meInitial} tone="me" />
-      <OwnerBadge letter={partnerInitial} tone="partner" />
+    <View style={styles.linkedPair}>
+      <View style={styles.linkedBar} />
+      <View style={[styles.linkedBadge, styles.linkedBadgeFront]}>
+        <OwnerBadge letter={meInitial} tone="shared" />
+      </View>
+      <View style={[styles.linkedBadge, styles.linkedBadgeBack]}>
+        <OwnerBadge letter={partnerInitial} tone="shared" />
+      </View>
     </View>
   );
 }
@@ -318,7 +325,7 @@ export function WeekDayCards() {
           onPress={() => setMonthOpen(true)}
           haptic="light"
         >
-          <Ionicons name="calendar-outline" size={18} color={colors.white} />
+          <Ionicons name="calendar-outline" size={18} color={colors.inkSoft} />
           <Text style={styles.monthButtonText}>Calendar view</Text>
         </PressableScale>
       </ScrollView>
@@ -578,16 +585,46 @@ const styles = StyleSheet.create({
   ownerBadgePartner: {
     backgroundColor: colors.partner,
   },
+  ownerBadgeShared: {
+    backgroundColor: colors.shared,
+  },
   ownerBadgeText: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 10,
     color: colors.white,
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     lineHeight: 12,
+    width: 22,
+    marginTop: 0.5,
   },
-  ownerBadgePair: {
+  linkedPair: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    width: 36,
+    height: 22,
+    position: 'relative',
+  },
+  linkedBar: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.shared,
+  },
+  linkedBadge: {
+    position: 'absolute',
+    top: 0,
+  },
+  linkedBadgeFront: {
+    left: 0,
+    zIndex: 2,
+  },
+  linkedBadgeBack: {
+    right: 0,
+    zIndex: 1,
   },
   togetherBlob: {
     backgroundColor: colors.sharedSoft,
@@ -625,21 +662,21 @@ const styles = StyleSheet.create({
   },
   monthButton: {
     marginTop: 12,
-    alignSelf: 'center',
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: colors.ink,
-    borderRadius: 999,
+    backgroundColor: colors.fill,
+    borderRadius: 14,
     paddingVertical: 14,
-    paddingHorizontal: 22,
+    paddingHorizontal: 16,
     minHeight: 48,
   },
   monthButtonText: {
     fontFamily: 'Poppins_500Medium',
-    fontSize: 14,
-    color: colors.white,
+    fontSize: 13,
+    color: colors.inkSoft,
   },
   monthOverlay: {
     flex: 1,

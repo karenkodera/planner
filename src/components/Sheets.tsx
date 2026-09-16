@@ -70,16 +70,18 @@ export function SheetsHost() {
 }
 
 function CreateEventSheet() {
-  const { sheet, closeSheet, addFromVoice } = useCalendar();
+  const { sheet, closeSheet, addFromVoice, freeSlots, createFromSlot } = useCalendar();
   const visible = sheet.type === 'create';
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
+  const [showFindTime, setShowFindTime] = useState(false);
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (visible) {
       setText('');
       setListening(false);
+      setShowFindTime(false);
     }
   }, [visible]);
 
@@ -121,45 +123,101 @@ function CreateEventSheet() {
 
   return (
     <SheetShell visible onClose={closeSheet} title="New event">
-      <View style={styles.composeRow}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder="Tell us what you’re doing at what time on what date with who and we’ll put it in the calendar."
-          placeholderTextColor={colors.muted}
-          style={styles.composeInput}
-          multiline
-          textAlignVertical="top"
-        />
-        <Animated.View style={{ transform: [{ scale: pulse }] }}>
-          <Pressable
-            onPress={startListening}
-            style={[styles.micBtn, listening && styles.micBtnOn]}
-            accessibilityLabel="Dictate with microphone"
-          >
-            <Ionicons
-              name={listening ? 'mic' : 'mic-outline'}
-              size={22}
-              color={listening ? colors.white : colors.ink}
-            />
-          </Pressable>
-        </Animated.View>
-      </View>
-
-      <Text style={styles.composeHint}>
-        {listening
-          ? 'Listening…'
-          : 'Type it out, or tap the mic and say it.'}
-      </Text>
-
-      <PressableScale
-        style={[styles.primaryBtn, !text.trim() && styles.btnDisabled]}
-        onPress={submit}
-        disabled={!text.trim()}
-        haptic="light"
+      <ScrollView
+        style={styles.createScroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.primaryBtnText}>Add to calendar</Text>
-      </PressableScale>
+        <View style={styles.composeRow}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Tell us what you’re doing at what time on what date with who and we’ll put it in the calendar."
+            placeholderTextColor={colors.muted}
+            style={styles.composeInput}
+            multiline
+            textAlignVertical="top"
+          />
+          <Animated.View style={{ transform: [{ scale: pulse }] }}>
+            <Pressable
+              onPress={startListening}
+              style={[styles.micBtn, listening && styles.micBtnOn]}
+              accessibilityLabel="Dictate with microphone"
+            >
+              <Ionicons
+                name={listening ? 'mic' : 'mic-outline'}
+                size={22}
+                color={listening ? colors.white : colors.ink}
+              />
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        <Text style={styles.composeHint}>
+          {listening
+            ? 'Listening…'
+            : 'Type it out, or tap the mic and say it.'}
+        </Text>
+
+        <PressableScale
+          style={[styles.primaryBtn, !text.trim() && styles.btnDisabled]}
+          onPress={submit}
+          disabled={!text.trim()}
+          haptic="light"
+        >
+          <Text style={styles.primaryBtnText}>Add to calendar</Text>
+        </PressableScale>
+
+        <View style={styles.findTimeBlock}>
+          <PressableScale
+            style={styles.findTimeToggle}
+            onPress={() => setShowFindTime((v) => !v)}
+            haptic="selection"
+          >
+            <View style={styles.findTimeToggleLeft}>
+              <Ionicons name="sparkles-outline" size={16} color={colors.ink} />
+              <View style={styles.findTimeCopy}>
+                <Text style={styles.findTimeTitle}>Find time together</Text>
+                <Text style={styles.findTimeSub}>Open windows when you’re both free</Text>
+              </View>
+            </View>
+            <Ionicons
+              name={showFindTime ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={colors.muted}
+            />
+          </PressableScale>
+
+          {showFindTime ? (
+            <View style={styles.findTimeList}>
+              {freeSlots.map((slot) => (
+                <PressableScale
+                  key={slot.id}
+                  style={styles.slotCard}
+                  onPress={() => {
+                    createFromSlot(slot, 'Time together');
+                    closeSheet();
+                  }}
+                  haptic="light"
+                >
+                  <View>
+                    <Text style={styles.slotDay}>{slot.dayLabel}</Text>
+                    <Text style={styles.slotTime}>{slot.timeLabel}</Text>
+                  </View>
+                  <View style={styles.slotBadge}>
+                    <Text style={styles.slotBadgeText}>
+                      {slotDurationLabel(slot.durationMinutes)}
+                    </Text>
+                  </View>
+                </PressableScale>
+              ))}
+              {!freeSlots.length ? (
+                <Text style={styles.empty}>No mutual openings this week — try next week.</Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
     </SheetShell>
   );
 }
@@ -479,6 +537,46 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     ...type.bodyMedium,
     color: colors.white,
+  },
+  createScroll: {
+    maxHeight: 520,
+  },
+  findTimeBlock: {
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  findTimeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.fill,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  findTimeToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  findTimeCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  findTimeTitle: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.ink,
+  },
+  findTimeSub: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: colors.muted,
+  },
+  findTimeList: {
+    marginTop: 10,
   },
   secondaryBtn: {
     backgroundColor: colors.sharedSoft,
