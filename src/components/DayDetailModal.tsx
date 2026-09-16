@@ -22,7 +22,8 @@ import { eventTouchesDay, format, formatEventTime, isSameDay, overlaps } from '.
 const HOUR_HEIGHT = 64;
 const DAY_START = 8;
 const DAY_END = 22;
-const WORK_END = 17;
+const WORK_END_ME = 17;
+const WORK_END_PARTNER = 18;
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
 const TIMELINE_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT;
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -139,6 +140,7 @@ function DayTimelinePage({
   requests,
   coupleNames,
   selection,
+  isActive,
   onSelectEvent,
   onSelectRequest,
 }: {
@@ -147,9 +149,11 @@ function DayTimelinePage({
   requests: SharedRequest[];
   coupleNames: { me: string; partner: string };
   selection: Selection;
+  isActive: boolean;
   onSelectEvent: (e: CalendarEvent) => void;
   onSelectRequest: (r: SharedRequest) => void;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
   const dayEvents = events.filter((e) => eventTouchesDay(e.start, e.end, day));
   const mine = dayEvents.filter((e) => e.owner === 'me');
   const partner = dayEvents.filter((e) => e.owner === 'partner');
@@ -170,7 +174,17 @@ function DayTimelinePage({
         ? selection.request.id
         : null;
 
-  const workHeight = (WORK_END - DAY_START) * HOUR_HEIGHT;
+  const workHeightMe = (WORK_END_ME - DAY_START) * HOUR_HEIGHT;
+  const workHeightPartner = (WORK_END_PARTNER - DAY_START) * HOUR_HEIGHT;
+  const weekday = isWeekday(day);
+
+  useEffect(() => {
+    if (!isActive || !weekday) return;
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: false });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [isActive, weekday, day]);
 
   return (
     <View style={[styles.page, { width: SCREEN_W }]}>
@@ -180,6 +194,7 @@ function DayTimelinePage({
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.timelineScroll}
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
@@ -198,13 +213,15 @@ function DayTimelinePage({
           })}
 
           <View style={styles.lanes}>
-            {isWeekday(day) ? (
-              <View style={[styles.workBlock, { height: workHeight }]} pointerEvents="none">
-                <Text style={styles.workBlockText}>Until 5pm</Text>
-              </View>
-            ) : null}
-
             <View style={styles.lane}>
+              {weekday ? (
+                <View
+                  style={[styles.workBlock, { height: workHeightMe }]}
+                  pointerEvents="none"
+                >
+                  <Text style={styles.workBlockText}>Work</Text>
+                </View>
+              ) : null}
               {mine.map((e) => (
                 <EventBlock
                   key={e.id}
@@ -216,6 +233,14 @@ function DayTimelinePage({
               ))}
             </View>
             <View style={styles.lane}>
+              {weekday ? (
+                <View
+                  style={[styles.workBlock, { height: workHeightPartner }]}
+                  pointerEvents="none"
+                >
+                  <Text style={styles.workBlockText}>Work</Text>
+                </View>
+              ) : null}
               {partner.map((e) => (
                 <EventBlock
                   key={e.id}
@@ -383,7 +408,7 @@ export function DayDetailModal({
           decelerationRate="fast"
           style={styles.pager}
         >
-          {days.map((day) => (
+          {days.map((day, idx) => (
             <DayTimelinePage
               key={day.toISOString()}
               day={day}
@@ -391,6 +416,7 @@ export function DayDetailModal({
               requests={requests}
               coupleNames={{ me: couple.me.name, partner: couple.partner.name }}
               selection={selection}
+              isActive={idx === pageIndex}
               onSelectEvent={(event) => {
                 setSelection({ kind: 'event', event });
                 Haptics.selectionAsync();

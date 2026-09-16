@@ -1,11 +1,15 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +23,13 @@ import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
 import { format, weekLabel } from '../utils/date';
 import { AtmosphereBackground } from '../components/Atmosphere';
+
+if (
+  Platform.OS === 'android'
+  && UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export function HomeScreen() {
   const {
@@ -34,11 +45,25 @@ export function HomeScreen() {
   } = useCalendar();
   const lastWeekTap = useRef(0);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [requestsOpen, setRequestsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchAnim = useRef(new Animated.Value(0)).current;
   const weekPulse = useRef(new Animated.Value(1)).current;
+  const drawerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(drawerAnim, {
+      toValue: requestsOpen ? 1 : 0,
+      duration: 280,
+      easing: requestsOpen
+        ? Easing.out(Easing.cubic)
+        : Easing.in(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [requestsOpen, drawerAnim]);
 
   const openSearch = () => {
+    if (requestsOpen) setRequestsOpen(false);
     setSearchOpen(true);
     setQuery('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -62,6 +87,18 @@ export function HomeScreen() {
         setQuery('');
       }
     });
+  };
+
+  const toggleRequests = () => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        280,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+    Haptics.selectionAsync();
+    setRequestsOpen((v) => !v);
   };
 
   const onWeekLabelPress = () => {
@@ -99,6 +136,12 @@ export function HomeScreen() {
     );
   }, [requests, q]);
 
+  const activeRequests = useMemo(
+    () =>
+      requests.filter((r) => r.status === 'pending' || r.status === 'suggested'),
+    [requests],
+  );
+
   const actionsOpacity = searchAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 0],
@@ -117,6 +160,15 @@ export function HomeScreen() {
     outputRange: [12, 0],
   });
 
+  const drawerMaxHeight = drawerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.min(280, 56 + activeRequests.length * 72)],
+  });
+  const drawerOpacity = drawerAnim.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.4, 1],
+  });
+
   return (
     <AtmosphereBackground>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
@@ -129,35 +181,50 @@ export function HomeScreen() {
               ]}
               pointerEvents="auto"
             >
-              <PressableScale
-                style={styles.topBtn}
-                onPress={() => openSheet({ type: 'requests' })}
-                haptic="selection"
-              >
-                <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
-                <Text style={styles.topBtnText}>Requests</Text>
-                {pendingCount > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{pendingCount}</Text>
-                  </View>
-                ) : null}
-              </PressableScale>
-              <PressableScale
-                style={[styles.topBtn, styles.topBtnPrimary]}
-                onPress={() => openSheet({ type: 'create' })}
-                haptic="light"
-              >
-                <Ionicons name="add" size={16} color={colors.white} />
-                <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
-              </PressableScale>
-              <PressableScale
-                style={styles.searchBtn}
-                onPress={openSearch}
-                haptic="selection"
-                scaleTo={0.9}
-              >
-                <Ionicons name="search" size={18} color={colors.ink} />
-              </PressableScale>
+              <View style={styles.requestsTabWrap}>
+                <PressableScale
+                  style={[
+                    styles.topBtn,
+                    styles.requestsTab,
+                    requestsOpen && styles.requestsTabOpen,
+                  ]}
+                  onPress={toggleRequests}
+                  haptic="selection"
+                >
+                  <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
+                  <Text style={styles.topBtnText}>Requests</Text>
+                  {pendingCount > 0 ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{pendingCount}</Text>
+                    </View>
+                  ) : null}
+                  <Ionicons
+                    name={requestsOpen ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color={colors.muted}
+                  />
+                </PressableScale>
+              </View>
+
+              <View style={styles.iconGroup}>
+                <PressableScale
+                  style={[styles.iconBtn, styles.iconBtnLeft]}
+                  onPress={() => openSheet({ type: 'create' })}
+                  haptic="light"
+                  scaleTo={0.9}
+                >
+                  <Ionicons name="add" size={20} color={colors.ink} />
+                </PressableScale>
+                <View style={styles.iconDivider} />
+                <PressableScale
+                  style={[styles.iconBtn, styles.iconBtnRight]}
+                  onPress={openSearch}
+                  haptic="selection"
+                  scaleTo={0.9}
+                >
+                  <Ionicons name="search" size={18} color={colors.ink} />
+                </PressableScale>
+              </View>
             </Animated.View>
           ) : (
             <Animated.View
@@ -184,10 +251,7 @@ export function HomeScreen() {
                   returnKeyType="search"
                 />
                 {query.length > 0 ? (
-                  <Pressable
-                    onPress={() => setQuery('')}
-                    hitSlop={8}
-                  >
+                  <Pressable onPress={() => setQuery('')} hitSlop={8}>
                     <Ionicons name="close-circle" size={18} color={colors.muted} />
                   </Pressable>
                 ) : null}
@@ -260,7 +324,26 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        <Animated.View style={[styles.weekNav, { transform: [{ scale: weekPulse }] }]}>
+        <Animated.View
+          style={[
+            styles.weekNav,
+            {
+              transform: [{ scale: weekPulse }],
+              marginBottom: drawerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [12, 0],
+              }),
+              borderBottomLeftRadius: drawerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [14, 0],
+              }),
+              borderBottomRightRadius: drawerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [14, 0],
+              }),
+            },
+          ]}
+        >
           <PressableScale
             onPress={() => goWeek(-1)}
             hitSlop={12}
@@ -284,6 +367,56 @@ export function HomeScreen() {
           </PressableScale>
         </Animated.View>
 
+        <Animated.View
+          style={[
+            styles.requestsDrawer,
+            {
+              maxHeight: drawerMaxHeight,
+              opacity: drawerOpacity,
+              marginBottom: drawerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 12],
+              }),
+            },
+          ]}
+          pointerEvents={requestsOpen ? 'auto' : 'none'}
+        >
+          <View style={styles.requestsDrawerInner}>
+            <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              style={styles.requestsDrawerScroll}
+            >
+              {activeRequests.map((request) => (
+                <PressableScale
+                  key={request.id}
+                  style={styles.drawerRow}
+                  onPress={() => {
+                    setRequestsOpen(false);
+                    openSheet({ type: 'requestDetail', request });
+                  }}
+                  haptic="selection"
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.drawerTitle}>{request.title}</Text>
+                    <Text style={styles.drawerMeta}>
+                      {format(request.proposedStart, 'EEE · h:mm a')}
+                      {' · '}
+                      {request.from === 'me' ? 'You requested' : `From ${couple.partner.name}`}
+                      {' · '}
+                      {request.status}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </PressableScale>
+              ))}
+              {!activeRequests.length ? (
+                <Text style={styles.drawerEmpty}>No open requests</Text>
+              ) : null}
+            </ScrollView>
+          </View>
+        </Animated.View>
+
         <WeekDayCards />
       </SafeAreaView>
 
@@ -305,17 +438,41 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 8,
   },
-  searchBtn: {
+  requestsTabWrap: {
+    flexShrink: 1,
+  },
+  requestsTab: {
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  requestsTabOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingBottom: 10,
+  },
+  iconGroup: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.fill,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 'auto',
+  },
+  iconBtnLeft: {},
+  iconBtnRight: {},
+  iconDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 22,
+    backgroundColor: 'rgba(60, 60, 67, 0.28)',
   },
   searchRow: {
     flexDirection: 'row',
@@ -387,16 +544,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  topBtnPrimary: {
-    backgroundColor: colors.ink,
-  },
   topBtnText: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 12,
     color: colors.ink,
-  },
-  topBtnTextPrimary: {
-    color: colors.white,
   },
   badge: {
     minWidth: 18,
@@ -420,8 +571,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 6,
     paddingVertical: 6,
-    marginBottom: 12,
     width: '100%',
+    overflow: 'hidden',
   },
   weekLabelHit: {
     flex: 1,
@@ -443,5 +594,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 10,
     backgroundColor: colors.white,
+  },
+  requestsDrawer: {
+    overflow: 'hidden',
+    backgroundColor: colors.fill,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  requestsDrawerInner: {
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  requestsDrawerScroll: {
+    maxHeight: 260,
+  },
+  drawerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 6,
+    marginVertical: 2,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+  },
+  drawerTitle: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.ink,
+  },
+  drawerMeta: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  drawerEmpty: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: colors.muted,
+    fontStyle: 'italic',
+    paddingHorizontal: 16,
+    paddingVertical: 18,
   },
 });
