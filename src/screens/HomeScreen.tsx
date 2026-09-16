@@ -1,73 +1,266 @@
-import React, { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { AtmosphereBackground, BrandMark } from '../components/Atmosphere';
 import { PressableScale } from '../components/PressableScale';
 import { WeekDayCards } from '../components/WeekCalendar';
 import { SheetsHost } from '../components/Sheets';
 import { useCalendar } from '../store/CalendarContext';
 import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
-import { weekLabel } from '../utils/date';
+import { format, weekLabel } from '../utils/date';
+import { AtmosphereBackground } from '../components/Atmosphere';
 
 export function HomeScreen() {
-  const { weekAnchor, goWeek, jumpToDay, openSheet, pendingCount, today } =
-    useCalendar();
+  const {
+    weekAnchor,
+    goWeek,
+    jumpToDay,
+    openSheet,
+    pendingCount,
+    today,
+    events,
+    requests,
+    couple,
+  } = useCalendar();
   const lastWeekTap = useRef(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchAnim = useRef(new Animated.Value(0)).current;
+  const weekPulse = useRef(new Animated.Value(1)).current;
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    setQuery('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.spring(searchAnim, {
+      toValue: 1,
+      friction: 7,
+      tension: 140,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeSearch = () => {
+    Haptics.selectionAsync();
+    Animated.timing(searchAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setSearchOpen(false);
+        setQuery('');
+      }
+    });
+  };
 
   const onWeekLabelPress = () => {
     const now = Date.now();
     if (now - lastWeekTap.current < 320) {
       jumpToDay(today);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Animated.sequence([
+        Animated.spring(weekPulse, { toValue: 1.04, useNativeDriver: true, friction: 5 }),
+        Animated.spring(weekPulse, { toValue: 1, useNativeDriver: true, friction: 6 }),
+      ]).start();
       lastWeekTap.current = 0;
       return;
     }
     lastWeekTap.current = now;
   };
 
+  const q = query.trim().toLowerCase();
+  const matchedEvents = useMemo(() => {
+    if (!q) return [];
+    return events.filter(
+      (e) =>
+        e.title.toLowerCase().includes(q)
+        || (e.location ?? '').toLowerCase().includes(q)
+        || (e.notes ?? '').toLowerCase().includes(q),
+    );
+  }, [events, q]);
+  const matchedRequests = useMemo(() => {
+    if (!q) return [];
+    return requests.filter(
+      (r) =>
+        r.title.toLowerCase().includes(q)
+        || (r.location ?? '').toLowerCase().includes(q)
+        || (r.notes ?? '').toLowerCase().includes(q),
+    );
+  }, [requests, q]);
+
+  const actionsOpacity = searchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+  const actionsScale = searchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.96],
+  });
+  const searchOpacity = searchAnim;
+  const searchScale = searchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.92, 1],
+  });
+  const searchTranslate = searchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
+  });
+
   return (
     <AtmosphereBackground>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.header}>
-          <BrandMark />
-          <PressableScale
-            style={styles.searchBtn}
-            onPress={() => openSheet({ type: 'search' })}
-            haptic="selection"
-            scaleTo={0.92}
-          >
-            <Ionicons name="search" size={18} color={colors.ink} />
-          </PressableScale>
-        </View>
-
-        <View style={styles.actionRow}>
-          <PressableScale
-            style={styles.topBtn}
-            onPress={() => openSheet({ type: 'requests' })}
-            haptic="selection"
-          >
-            <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
-            <Text style={styles.topBtnText}>Requests</Text>
-            {pendingCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{pendingCount}</Text>
+          {!searchOpen ? (
+            <Animated.View
+              style={[
+                styles.actionRow,
+                { opacity: actionsOpacity, transform: [{ scale: actionsScale }] },
+              ]}
+              pointerEvents="auto"
+            >
+              <PressableScale
+                style={styles.topBtn}
+                onPress={() => openSheet({ type: 'requests' })}
+                haptic="selection"
+              >
+                <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
+                <Text style={styles.topBtnText}>Requests</Text>
+                {pendingCount > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{pendingCount}</Text>
+                  </View>
+                ) : null}
+              </PressableScale>
+              <PressableScale
+                style={[styles.topBtn, styles.topBtnPrimary]}
+                onPress={() => openSheet({ type: 'create' })}
+                haptic="light"
+              >
+                <Ionicons name="add" size={16} color={colors.white} />
+                <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
+              </PressableScale>
+              <PressableScale
+                style={styles.searchBtn}
+                onPress={openSearch}
+                haptic="selection"
+                scaleTo={0.9}
+              >
+                <Ionicons name="search" size={18} color={colors.ink} />
+              </PressableScale>
+            </Animated.View>
+          ) : (
+            <Animated.View
+              style={[
+                styles.searchRow,
+                {
+                  opacity: searchOpacity,
+                  transform: [
+                    { scale: searchScale },
+                    { translateY: searchTranslate },
+                  ],
+                },
+              ]}
+            >
+              <View style={styles.searchField}>
+                <Ionicons name="search" size={18} color={colors.muted} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search plans…"
+                  placeholderTextColor={colors.muted}
+                  style={styles.searchInput}
+                  autoFocus
+                  returnKeyType="search"
+                />
+                {query.length > 0 ? (
+                  <Pressable
+                    onPress={() => setQuery('')}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close-circle" size={18} color={colors.muted} />
+                  </Pressable>
+                ) : null}
               </View>
-            ) : null}
-          </PressableScale>
-          <PressableScale
-            style={[styles.topBtn, styles.topBtnPrimary]}
-            onPress={() => openSheet({ type: 'create' })}
-            haptic="light"
-          >
-            <Ionicons name="add" size={16} color={colors.white} />
-            <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
-          </PressableScale>
+              <PressableScale
+                style={styles.searchCancel}
+                onPress={closeSearch}
+                haptic="selection"
+                scaleTo={0.94}
+              >
+                <Text style={styles.searchCancelText}>Cancel</Text>
+              </PressableScale>
+            </Animated.View>
+          )}
         </View>
 
-        <View style={styles.weekNav}>
+        {searchOpen && q ? (
+          <View style={styles.searchResults}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              style={{ maxHeight: 220 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {matchedEvents.map((event) => (
+                <PressableScale
+                  key={event.id}
+                  style={styles.resultRow}
+                  onPress={() => {
+                    jumpToDay(event.start);
+                    closeSearch();
+                  }}
+                  haptic="selection"
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.resultTitle}>{event.title}</Text>
+                    <Text style={styles.resultMeta}>
+                      {format(event.start, 'EEE · MMM d · h:mm a')}
+                      {' · '}
+                      {event.owner === 'me'
+                        ? couple.me.name
+                        : event.owner === 'partner'
+                          ? couple.partner.name
+                          : 'Together'}
+                    </Text>
+                  </View>
+                </PressableScale>
+              ))}
+              {matchedRequests.map((request) => (
+                <PressableScale
+                  key={request.id}
+                  style={styles.resultRow}
+                  onPress={() => {
+                    openSheet({ type: 'requestDetail', request });
+                    closeSearch();
+                  }}
+                  haptic="selection"
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.resultTitle}>{request.title}</Text>
+                    <Text style={styles.resultMeta}>
+                      {format(request.proposedStart, 'EEE · MMM d · h:mm a')} · request
+                    </Text>
+                  </View>
+                </PressableScale>
+              ))}
+              {!matchedEvents.length && !matchedRequests.length ? (
+                <Text style={styles.noResults}>No matches</Text>
+              ) : null}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        <Animated.View style={[styles.weekNav, { transform: [{ scale: weekPulse }] }]}>
           <PressableScale
             onPress={() => goWeek(-1)}
             hitSlop={12}
@@ -89,7 +282,7 @@ export function HomeScreen() {
           >
             <Ionicons name="chevron-forward" size={18} color={colors.ink} />
           </PressableScale>
-        </View>
+        </Animated.View>
 
         <WeekDayCards />
       </SafeAreaView>
@@ -106,10 +299,14 @@ const styles = StyleSheet.create({
   },
   header: {
     marginTop: 4,
-    marginBottom: 10,
+    marginBottom: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
   },
   searchBtn: {
     width: 40,
@@ -118,12 +315,68 @@ const styles = StyleSheet.create({
     backgroundColor: colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 'auto',
   },
-  actionRow: {
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  searchField: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: colors.fill,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 15,
+    color: colors.ink,
+    padding: 0,
+  },
+  searchCancel: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  searchCancelText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.inkSoft,
+  },
+  searchResults: {
+    backgroundColor: colors.canvasElevated,
+    borderRadius: 16,
+    paddingVertical: 6,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  resultRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  resultTitle: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.ink,
+  },
+  resultMeta: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  noResults: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: colors.muted,
+    padding: 14,
+    fontStyle: 'italic',
   },
   topBtn: {
     flexDirection: 'row',

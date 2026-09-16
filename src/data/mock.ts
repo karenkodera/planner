@@ -109,4 +109,15 @@ export const mockRequests: SharedRequest[] = [
     status: 'pending',
     createdAt: atTime(tue, 20, 0),
   },
+  {
+    id: 'r2',
+    title: 'Catch a movie?',
+    notes: 'Something light after work',
+    location: 'Scotiabank Theatre',
+    proposedStart: atTime(wed, 19, 30),
+    proposedEnd: atTime(wed, 21, 30),
+    from: 'me',
+    status: 'pending',
+    createdAt: atTime(tue, 12, 0),
+  },
 ];

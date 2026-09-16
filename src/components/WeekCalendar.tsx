@@ -68,20 +68,51 @@ function MiniInitial({
   selected,
 }: {
   letter: string;
-  tone: 'me' | 'partner';
+  tone: 'me' | 'partner' | 'shared';
   selected?: boolean;
 }) {
   return (
     <View
       style={[
         styles.miniInitial,
-        tone === 'me' ? styles.miniInitialMe : styles.miniInitialPartner,
-        selected && styles.miniInitialOnDark,
+        tone === 'me' && styles.miniInitialMe,
+        tone === 'partner' && styles.miniInitialPartner,
+        tone === 'shared' && styles.miniInitialShared,
+        selected && tone !== 'shared' && styles.miniInitialOnDark,
+        selected && tone === 'shared' && styles.miniInitialSharedOnDark,
       ]}
     >
-      <Text style={[styles.miniInitialText, selected && styles.miniInitialTextOnDark]}>
+      <Text
+        style={[
+          styles.miniInitialText,
+          selected && tone !== 'shared' && styles.miniInitialTextOnDark,
+          selected && tone === 'shared' && styles.miniInitialTextSharedOnDark,
+        ]}
+      >
         {letter}
       </Text>
+    </View>
+  );
+}
+
+function LinkedMonthMarks({
+  meInitial,
+  partnerInitial,
+  selected,
+}: {
+  meInitial: string;
+  partnerInitial: string;
+  selected?: boolean;
+}) {
+  return (
+    <View style={styles.linkedMonthPair}>
+      <View style={styles.linkedMonthBar} />
+      <View style={[styles.linkedMonthBadge, styles.linkedMonthFront]}>
+        <MiniInitial letter={meInitial} tone="shared" selected={selected} />
+      </View>
+      <View style={[styles.linkedMonthBadge, styles.linkedMonthBack]}>
+        <MiniInitial letter={partnerInitial} tone="shared" selected={selected} />
+      </View>
     </View>
   );
 }
@@ -230,11 +261,15 @@ function DayCard({
             }
 
             const { request } = item;
+            const outgoing = request.from === 'me';
             return (
               <Pressable
                 key={`req-${request.id}`}
                 onPress={() => onRequestPress(request)}
-                style={styles.requestBox}
+                style={[
+                  styles.requestBox,
+                  outgoing ? styles.requestBoxOutgoing : styles.requestBoxIncoming,
+                ]}
               >
                 <View style={styles.requestRowInner}>
                   <EventLines
@@ -243,7 +278,14 @@ function DayCard({
                     titleStyle={styles.requestTitle}
                   />
                   <View style={styles.requestMeta}>
-                    <Text style={styles.requestPillText}>Request</Text>
+                    <Text
+                      style={[
+                        styles.requestPillText,
+                        outgoing && styles.requestPillOutgoing,
+                      ]}
+                    >
+                      {outgoing ? 'Requested' : 'Request'}
+                    </Text>
                     <OwnerBadges
                       owner="both"
                       meInitial={meInitial}
@@ -424,6 +466,23 @@ function MonthViewModal({
     useCalendar();
   const [monthAnchor, setMonthAnchor] = useState(weekAnchor);
   const slide = useRef(new Animated.Value(480)).current;
+  const pagerRef = useRef<ScrollView>(null);
+  const syncing = useRef(false);
+  const pageIndexRef = useRef(12);
+
+  const monthPages = useMemo(() => {
+    const origin = new Date(today.getFullYear(), today.getMonth(), 1);
+    return Array.from({ length: 25 }, (_, i) => addMonths(origin, i - 12));
+  }, [today]);
+
+  const anchorIndex = useMemo(() => {
+    const idx = monthPages.findIndex(
+      (m) =>
+        m.getFullYear() === monthAnchor.getFullYear()
+        && m.getMonth() === monthAnchor.getMonth(),
+    );
+    return idx >= 0 ? idx : 12;
+  }, [monthPages, monthAnchor]);
 
   useEffect(() => {
     if (visible) setMonthAnchor(weekAnchor);
@@ -440,13 +499,34 @@ function MonthViewModal({
     }).start();
   }, [visible, slide]);
 
-  const grid = useMemo(() => getMonthGrid(monthAnchor), [monthAnchor]);
+  useEffect(() => {
+    if (!visible) return;
+    if (pageIndexRef.current === anchorIndex) return;
+    syncing.current = true;
+    pageIndexRef.current = anchorIndex;
+    requestAnimationFrame(() => {
+      pagerRef.current?.scrollTo({ x: SCREEN_W * anchorIndex, animated: false });
+      setTimeout(() => {
+        syncing.current = false;
+      }, 50);
+    });
+  }, [visible, anchorIndex]);
+
   const dows = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   const selectDay = (day: Date) => {
     jumpToDay(day);
     Haptics.selectionAsync();
     onClose();
+  };
+
+  const onMonthMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (syncing.current) return;
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    if (idx === pageIndexRef.current || !monthPages[idx]) return;
+    pageIndexRef.current = idx;
+    setMonthAnchor(monthPages[idx]);
+    Haptics.selectionAsync();
   };
 
   return (
@@ -489,58 +569,88 @@ function MonthViewModal({
             ))}
           </View>
 
-          <View style={styles.monthGrid}>
-            {grid.map((day) => {
-              const inMonth = isSameMonth(day, monthAnchor);
-              const selected = isSameDay(day, selectedDay);
-              const isToday = isSameDay(day, today);
-              const dayEvents = events.filter((e) =>
-                eventTouchesDay(e.start, e.end, day),
-              );
-              const hasShared = dayEvents.some((e) => e.owner === 'shared');
-              const hasMine = dayEvents.some((e) => e.owner === 'me');
-              const hasPartner = dayEvents.some((e) => e.owner === 'partner');
-
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onMonthMomentumEnd}
+            decelerationRate="fast"
+            style={styles.monthPager}
+          >
+            {monthPages.map((month) => {
+              const grid = getMonthGrid(month);
               return (
-                <Pressable
-                  key={day.toISOString()}
-                  onPress={() => selectDay(day)}
-                  style={[
-                    styles.monthCell,
-                    selected && styles.monthCellSelected,
-                    isToday && !selected && styles.monthCellToday,
-                    !inMonth && styles.monthCellMuted,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.monthDayNum,
-                      selected && styles.monthDayNumSelected,
-                      !inMonth && styles.monthDayNumMuted,
-                    ]}
-                  >
-                    {format(day, 'd')}
-                  </Text>
-                  <View style={styles.monthMarks}>
-                    {(hasMine || hasShared) && (
-                      <MiniInitial
-                        letter={couple.me.initial}
-                        tone="me"
-                        selected={selected}
-                      />
-                    )}
-                    {(hasPartner || hasShared) && (
-                      <MiniInitial
-                        letter={couple.partner.initial}
-                        tone="partner"
-                        selected={selected}
-                      />
-                    )}
+                <View key={month.toISOString()} style={[styles.monthPage, { width: SCREEN_W }]}>
+                  <View style={styles.monthGrid}>
+                    {grid.map((day) => {
+                      const inMonth = isSameMonth(day, month);
+                      const selected = isSameDay(day, selectedDay);
+                      const isToday = isSameDay(day, today);
+                      const dayEvents = events.filter((e) =>
+                        eventTouchesDay(e.start, e.end, day),
+                      );
+                      const hasShared = dayEvents.some((e) => e.owner === 'shared');
+                      const hasMine = dayEvents.some((e) => e.owner === 'me');
+                      const hasPartner = dayEvents.some((e) => e.owner === 'partner');
+
+                      return (
+                        <View key={day.toISOString()} style={styles.monthCellWrap}>
+                          <PressableScale
+                            onPress={() => selectDay(day)}
+                            scaleTo={0.92}
+                            haptic="selection"
+                            style={[
+                              styles.monthCell,
+                              selected && styles.monthCellSelected,
+                              isToday && !selected && styles.monthCellToday,
+                              !inMonth && styles.monthCellMuted,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.monthDayNum,
+                                selected && styles.monthDayNumSelected,
+                                !inMonth && styles.monthDayNumMuted,
+                              ]}
+                            >
+                              {format(day, 'd')}
+                            </Text>
+                            <View style={styles.monthMarks}>
+                              {hasShared ? (
+                                <LinkedMonthMarks
+                                  meInitial={couple.me.initial}
+                                  partnerInitial={couple.partner.initial}
+                                  selected={selected}
+                                />
+                              ) : (
+                                <>
+                                  {hasMine ? (
+                                    <MiniInitial
+                                      letter={couple.me.initial}
+                                      tone="me"
+                                      selected={selected}
+                                    />
+                                  ) : null}
+                                  {hasPartner ? (
+                                    <MiniInitial
+                                      letter={couple.partner.initial}
+                                      tone="partner"
+                                      selected={selected}
+                                    />
+                                  ) : null}
+                                </>
+                              )}
+                            </View>
+                          </PressableScale>
+                        </View>
+                      );
+                    })}
                   </View>
-                </Pressable>
+                </View>
               );
             })}
-          </View>
+          </ScrollView>
 
           <PressableScale style={styles.monthClose} onPress={onClose} haptic="light">
             <Text style={styles.monthCloseText}>Done</Text>
@@ -713,11 +823,17 @@ const styles = StyleSheet.create({
   requestBox: {
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: colors.shared,
     borderStyle: 'dashed',
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  requestBoxIncoming: {
+    borderColor: colors.shared,
     backgroundColor: colors.sharedSoft,
+  },
+  requestBoxOutgoing: {
+    borderColor: 'rgba(60, 60, 67, 0.35)',
+    backgroundColor: 'transparent',
   },
   requestRowInner: {
     flexDirection: 'row',
@@ -737,6 +853,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_500Medium',
     fontSize: 10,
     color: colors.shared,
+  },
+  requestPillOutgoing: {
+    color: colors.muted,
   },
   monthButton: {
     marginTop: 12,
@@ -807,12 +926,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.muted,
   },
+  monthPager: {
+    marginHorizontal: -20,
+  },
+  monthPage: {
+    paddingHorizontal: 20,
+  },
   monthGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  monthCell: {
+  monthCellWrap: {
     width: `${100 / 7}%` as `${number}%`,
+  },
+  monthCell: {
     aspectRatio: 0.95,
     alignItems: 'center',
     justifyContent: 'center',
@@ -842,8 +969,9 @@ const styles = StyleSheet.create({
   monthMarks: {
     flexDirection: 'row',
     gap: 3,
-    height: 14,
+    height: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 3,
   },
   miniInitial: {
@@ -859,17 +987,54 @@ const styles = StyleSheet.create({
   miniInitialPartner: {
     backgroundColor: colors.partner,
   },
+  miniInitialShared: {
+    backgroundColor: colors.shared,
+  },
   miniInitialOnDark: {
     backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  miniInitialSharedOnDark: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
   },
   miniInitialText: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 8,
     color: colors.white,
     lineHeight: 10,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   miniInitialTextOnDark: {
     color: colors.ink,
+  },
+  miniInitialTextSharedOnDark: {
+    color: colors.shared,
+  },
+  linkedMonthPair: {
+    width: 24,
+    height: 14,
+    position: 'relative',
+  },
+  linkedMonthBar: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    top: 5,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.shared,
+  },
+  linkedMonthBadge: {
+    position: 'absolute',
+    top: 0,
+  },
+  linkedMonthFront: {
+    left: 0,
+    zIndex: 2,
+  },
+  linkedMonthBack: {
+    right: 0,
+    zIndex: 1,
   },
   monthClose: {
     marginTop: 18,

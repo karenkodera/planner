@@ -32,8 +32,8 @@ export function PressableScale({
     Animated.spring(scale, {
       toValue: value,
       useNativeDriver: true,
-      friction: 6,
-      tension: 320,
+      friction: 5,
+      tension: 380,
     }).start();
   };
 

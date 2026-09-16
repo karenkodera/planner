@@ -104,6 +104,7 @@ function RequestBlock({
     (request.proposedEnd.getTime() - request.proposedStart.getTime()) / 60000,
   );
   const height = durationMins * (HOUR_HEIGHT / 60);
+  const outgoing = request.from === 'me';
 
   return (
     <Pressable
@@ -111,7 +112,7 @@ function RequestBlock({
       style={[
         styles.block,
         styles.blockSpanning,
-        styles.blockRequest,
+        outgoing ? styles.blockRequestOutgoing : styles.blockRequestIncoming,
         { top, height },
         selected && styles.blockSelected,
       ]}
@@ -120,7 +121,8 @@ function RequestBlock({
         {request.title}
       </Text>
       <Text style={styles.blockTimeRequest}>
-        {format(request.proposedStart, 'h:mm a')} · request
+        {format(request.proposedStart, 'h:mm a')}
+        {outgoing ? ' · requested' : ' · request'}
       </Text>
     </Pressable>
   );
@@ -548,15 +550,21 @@ const styles = StyleSheet.create({
     right: 0,
   },
   blockSolo: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.fillStrong,
   },
   blockShared: {
-    backgroundColor: colors.shared,
+    backgroundColor: colors.sharedSoft,
   },
-  blockRequest: {
+  blockRequestIncoming: {
     backgroundColor: colors.sharedSoft,
     borderWidth: 1.5,
     borderColor: colors.shared,
+    borderStyle: 'dashed',
+  },
+  blockRequestOutgoing: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(60, 60, 67, 0.35)',
     borderStyle: 'dashed',
   },
   blockSelected: {
@@ -566,10 +574,10 @@ const styles = StyleSheet.create({
   blockTitle: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 13,
-    color: colors.white,
+    color: colors.ink,
   },
   blockTitleShared: {
-    color: colors.white,
+    color: colors.ink,
     fontFamily: 'Poppins_500Medium',
     fontSize: 13,
   },
@@ -581,11 +589,11 @@ const styles = StyleSheet.create({
   blockTime: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.muted,
     marginTop: 2,
   },
   blockTimeShared: {
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.inkSoft,
   },
   blockTimeRequest: {
     color: colors.inkSoft,
