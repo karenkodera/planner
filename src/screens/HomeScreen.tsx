@@ -67,10 +67,11 @@ export function HomeScreen() {
     setSearchOpen(true);
     setQuery('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Animated.spring(searchAnim, {
+    searchAnim.setValue(0);
+    Animated.timing(searchAnim, {
       toValue: 1,
-      friction: 7,
-      tension: 140,
+      duration: 260,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: true,
     }).start();
   };
@@ -79,7 +80,8 @@ export function HomeScreen() {
     Haptics.selectionAsync();
     Animated.timing(searchAnim, {
       toValue: 0,
-      duration: 180,
+      duration: 200,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
@@ -151,13 +153,13 @@ export function HomeScreen() {
     outputRange: [1, 0.96],
   });
   const searchOpacity = searchAnim;
-  const searchScale = searchAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
-  });
   const searchTranslate = searchAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [12, 0],
+    outputRange: [8, 0],
+  });
+  const searchScale = searchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.98, 1],
   });
 
   const drawerMaxHeight = drawerAnim.interpolate({
@@ -312,7 +314,7 @@ export function HomeScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.resultTitle}>{request.title}</Text>
                     <Text style={styles.resultMeta}>
-                      {format(request.proposedStart, 'EEE · MMM d · h:mm a')} · request
+                      {format(request.proposedStart, 'EEE · MMM d · h:mm a')} · RSVP
                     </Text>
                   </View>
                 </PressableScale>
@@ -326,56 +328,13 @@ export function HomeScreen() {
 
         <Animated.View
           style={[
-            styles.weekNav,
-            {
-              transform: [{ scale: weekPulse }],
-              marginBottom: drawerAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [12, 0],
-              }),
-              borderBottomLeftRadius: drawerAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [14, 0],
-              }),
-              borderBottomRightRadius: drawerAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [14, 0],
-              }),
-            },
-          ]}
-        >
-          <PressableScale
-            onPress={() => goWeek(-1)}
-            hitSlop={12}
-            style={styles.navBtn}
-            haptic="selection"
-            scaleTo={0.9}
-          >
-            <Ionicons name="chevron-back" size={18} color={colors.ink} />
-          </PressableScale>
-          <Pressable onPress={onWeekLabelPress} style={styles.weekLabelHit}>
-            <Text style={styles.weekLabel}>{weekLabel(weekAnchor, today)}</Text>
-          </Pressable>
-          <PressableScale
-            onPress={() => goWeek(1)}
-            hitSlop={12}
-            style={styles.navBtn}
-            haptic="selection"
-            scaleTo={0.9}
-          >
-            <Ionicons name="chevron-forward" size={18} color={colors.ink} />
-          </PressableScale>
-        </Animated.View>
-
-        <Animated.View
-          style={[
             styles.requestsDrawer,
             {
               maxHeight: drawerMaxHeight,
               opacity: drawerOpacity,
               marginBottom: drawerAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, 12],
+                outputRange: [0, 10],
               }),
             },
           ]}
@@ -402,19 +361,51 @@ export function HomeScreen() {
                     <Text style={styles.drawerMeta}>
                       {format(request.proposedStart, 'EEE · h:mm a')}
                       {' · '}
-                      {request.from === 'me' ? 'You requested' : `From ${couple.partner.name}`}
-                      {' · '}
-                      {request.status}
+                      {request.from === 'me'
+                        ? 'Awaiting reply'
+                        : `From ${couple.partner.name} · RSVP`}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                 </PressableScale>
               ))}
               {!activeRequests.length ? (
-                <Text style={styles.drawerEmpty}>No open requests</Text>
+                <Text style={styles.drawerEmpty}>Nothing needs a reply</Text>
               ) : null}
             </ScrollView>
           </View>
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.weekNav,
+            {
+              transform: [{ scale: weekPulse }],
+              marginBottom: 12,
+            },
+          ]}
+        >
+          <PressableScale
+            onPress={() => goWeek(-1)}
+            hitSlop={12}
+            style={styles.navBtn}
+            haptic="selection"
+            scaleTo={0.9}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.ink} />
+          </PressableScale>
+          <Pressable onPress={onWeekLabelPress} style={styles.weekLabelHit}>
+            <Text style={styles.weekLabel}>{weekLabel(weekAnchor, today)}</Text>
+          </Pressable>
+          <PressableScale
+            onPress={() => goWeek(1)}
+            hitSlop={12}
+            style={styles.navBtn}
+            haptic="selection"
+            scaleTo={0.9}
+          >
+            <Ionicons name="chevron-forward" size={18} color={colors.ink} />
+          </PressableScale>
         </Animated.View>
 
         <WeekDayCards />
@@ -432,7 +423,7 @@ const styles = StyleSheet.create({
   },
   header: {
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 8,
     minHeight: 44,
     justifyContent: 'center',
   },
@@ -600,6 +591,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.fill,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 16,
   },
   requestsDrawerInner: {
     paddingTop: 4,

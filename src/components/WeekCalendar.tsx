@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Easing,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -284,7 +285,7 @@ function DayCard({
                         outgoing && styles.requestPillOutgoing,
                       ]}
                     >
-                      {outgoing ? 'Requested' : 'Request'}
+                      {outgoing ? 'Awaiting reply' : 'RSVP'}
                     </Text>
                     <OwnerBadges
                       owner="both"
@@ -465,52 +466,31 @@ function MonthViewModal({
   const { weekAnchor, selectedDay, events, today, jumpToDay, couple } =
     useCalendar();
   const [monthAnchor, setMonthAnchor] = useState(weekAnchor);
-  const slide = useRef(new Animated.Value(480)).current;
+  const slide = useRef(new Animated.Value(0)).current;
   const pagerRef = useRef<ScrollView>(null);
   const syncing = useRef(false);
-  const pageIndexRef = useRef(12);
-
-  const monthPages = useMemo(() => {
-    const origin = new Date(today.getFullYear(), today.getMonth(), 1);
-    return Array.from({ length: 25 }, (_, i) => addMonths(origin, i - 12));
-  }, [today]);
-
-  const anchorIndex = useMemo(() => {
-    const idx = monthPages.findIndex(
-      (m) =>
-        m.getFullYear() === monthAnchor.getFullYear()
-        && m.getMonth() === monthAnchor.getMonth(),
-    );
-    return idx >= 0 ? idx : 12;
-  }, [monthPages, monthAnchor]);
+  const PAGE_W = SCREEN_W;
 
   useEffect(() => {
-    if (visible) setMonthAnchor(weekAnchor);
-  }, [visible, weekAnchor]);
+    if (visible) {
+      setMonthAnchor(weekAnchor);
+      slide.setValue(40);
+      Animated.timing(slide, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      requestAnimationFrame(() => {
+        pagerRef.current?.scrollTo({ x: PAGE_W, animated: false });
+      });
+    }
+  }, [visible, weekAnchor, slide, PAGE_W]);
 
-  useEffect(() => {
-    if (!visible) return;
-    slide.setValue(480);
-    Animated.spring(slide, {
-      toValue: 0,
-      damping: 22,
-      stiffness: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [visible, slide]);
-
-  useEffect(() => {
-    if (!visible) return;
-    if (pageIndexRef.current === anchorIndex) return;
-    syncing.current = true;
-    pageIndexRef.current = anchorIndex;
-    requestAnimationFrame(() => {
-      pagerRef.current?.scrollTo({ x: SCREEN_W * anchorIndex, animated: false });
-      setTimeout(() => {
-        syncing.current = false;
-      }, 50);
-    });
-  }, [visible, anchorIndex]);
+  const monthPages = useMemo(
+    () => [addMonths(monthAnchor, -1), monthAnchor, addMonths(monthAnchor, 1)],
+    [monthAnchor],
+  );
 
   const dows = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -520,27 +500,50 @@ function MonthViewModal({
     onClose();
   };
 
+  const goMonth = (delta: number) => {
+    setMonthAnchor((d) => addMonths(d, delta));
+    requestAnimationFrame(() => {
+      pagerRef.current?.scrollTo({ x: PAGE_W, animated: false });
+    });
+  };
+
   const onMonthMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (syncing.current) return;
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
-    if (idx === pageIndexRef.current || !monthPages[idx]) return;
-    pageIndexRef.current = idx;
-    setMonthAnchor(monthPages[idx]);
+    const idx = Math.round(e.nativeEvent.contentOffset.x / PAGE_W);
+    if (idx === 1) return;
+    syncing.current = true;
+    const delta = idx === 0 ? -1 : 1;
+    setMonthAnchor((d) => addMonths(d, delta));
     Haptics.selectionAsync();
+    requestAnimationFrame(() => {
+      pagerRef.current?.scrollTo({ x: PAGE_W, animated: false });
+      syncing.current = false;
+    });
   };
+
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
       <View style={styles.monthOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View style={[styles.monthSheet, { transform: [{ translateY: slide }] }]}>
+        <Animated.View
+          style={[
+            styles.monthSheet,
+            {
+              opacity: slide.interpolate({
+                inputRange: [0, 40],
+                outputRange: [1, 0.85],
+              }),
+              transform: [{ translateY: slide }],
+            },
+          ]}
+        >
           <View style={styles.monthHandle} />
           <View style={styles.monthHeader}>
             <PressableScale
               hitSlop={12}
-              onPress={() => {
-                setMonthAnchor((d) => addMonths(d, -1));
-              }}
+              onPress={() => goMonth(-1)}
               style={styles.monthNavBtn}
               haptic="selection"
               scaleTo={0.9}
@@ -550,9 +553,7 @@ function MonthViewModal({
             <Text style={styles.monthTitle}>{formatDate(monthAnchor, 'MMMM yyyy')}</Text>
             <PressableScale
               hitSlop={12}
-              onPress={() => {
-                setMonthAnchor((d) => addMonths(d, 1));
-              }}
+              onPress={() => goMonth(1)}
               style={styles.monthNavBtn}
               haptic="selection"
               scaleTo={0.9}
@@ -577,11 +578,12 @@ function MonthViewModal({
             onMomentumScrollEnd={onMonthMomentumEnd}
             decelerationRate="fast"
             style={styles.monthPager}
+            contentOffset={{ x: PAGE_W, y: 0 }}
           >
             {monthPages.map((month) => {
               const grid = getMonthGrid(month);
               return (
-                <View key={month.toISOString()} style={[styles.monthPage, { width: SCREEN_W }]}>
+                <View key={month.toISOString()} style={[styles.monthPage, { width: PAGE_W }]}>
                   <View style={styles.monthGrid}>
                     {grid.map((day) => {
                       const inMonth = isSameMonth(day, month);
@@ -596,10 +598,8 @@ function MonthViewModal({
 
                       return (
                         <View key={day.toISOString()} style={styles.monthCellWrap}>
-                          <PressableScale
+                          <Pressable
                             onPress={() => selectDay(day)}
-                            scaleTo={0.92}
-                            haptic="selection"
                             style={[
                               styles.monthCell,
                               selected && styles.monthCellSelected,
@@ -642,7 +642,7 @@ function MonthViewModal({
                                 </>
                               )}
                             </View>
-                          </PressableScale>
+                          </Pressable>
                         </View>
                       );
                     })}
@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 36,
+    paddingBottom: 24,
   },
   monthHandle: {
     alignSelf: 'center',
@@ -1037,7 +1037,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   monthClose: {
-    marginTop: 18,
+    marginTop: 8,
     backgroundColor: colors.fill,
     borderRadius: 14,
     paddingVertical: 14,

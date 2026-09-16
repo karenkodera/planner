@@ -310,7 +310,7 @@ function SearchSheet() {
             <View style={{ flex: 1 }}>
               <Text style={styles.slotDay}>{request.title}</Text>
               <Text style={styles.slotTime}>
-                {format(request.proposedStart, 'EEE · MMM d · h:mm a')} · request
+                {format(request.proposedStart, 'EEE · MMM d · h:mm a')} · RSVP
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>

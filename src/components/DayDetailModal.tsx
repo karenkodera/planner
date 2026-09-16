@@ -123,7 +123,7 @@ function RequestBlock({
       </Text>
       <Text style={styles.blockTimeRequest}>
         {format(request.proposedStart, 'h:mm a')}
-        {outgoing ? ' · requested' : ' · request'}
+        {outgoing ? ' · awaiting reply' : ' · RSVP'}
       </Text>
     </Pressable>
   );
@@ -199,9 +199,9 @@ function DayTimelinePage({
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ height: TIMELINE_HEIGHT + 24 }}>
+        <View style={{ height: TIMELINE_HEIGHT + 34 }}>
           {HOURS.map((hour) => {
-            const top = (hour - DAY_START) * HOUR_HEIGHT;
+            const top = 10 + (hour - DAY_START) * HOUR_HEIGHT;
             return (
               <View key={hour} style={[styles.hourRow, { top }]}>
                 <Text style={styles.hourLabel}>
@@ -212,7 +212,7 @@ function DayTimelinePage({
             );
           })}
 
-          <View style={styles.lanes}>
+          <View style={[styles.lanes, { top: 10 }]}>
             <View style={styles.lane}>
               {weekday ? (
                 <View
@@ -294,7 +294,9 @@ function EventInfoPanel({
     return (
       <View style={styles.infoPanel}>
         <View style={styles.infoHeader}>
-          <Text style={styles.infoEyebrow}>Request</Text>
+          <Text style={styles.infoEyebrow}>
+            {request.from === 'me' ? 'Awaiting reply' : 'RSVP'}
+          </Text>
           <Pressable onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={18} color={colors.muted} />
           </Pressable>
@@ -306,7 +308,9 @@ function EventInfoPanel({
         {request.location ? <Text style={styles.infoMeta}>{request.location}</Text> : null}
         {request.notes ? <Text style={styles.infoNotes}>{request.notes}</Text> : null}
         <Pressable style={styles.infoAction} onPress={() => onOpenRequest(request)}>
-          <Text style={styles.infoActionText}>Respond to request</Text>
+          <Text style={styles.infoActionText}>
+            {request.from === 'me' ? 'View invite' : 'RSVP'}
+          </Text>
         </Pressable>
       </View>
     );
@@ -513,19 +517,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
-    height: 20,
+    alignItems: 'flex-start',
+    height: HOUR_HEIGHT,
   },
   hourLabel: {
     width: 44,
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
     color: colors.muted,
+    marginTop: -7,
+    textAlign: 'right',
+    paddingRight: 8,
   },
   hourLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.hairline,
+    marginTop: 0,
   },
   lanes: {
     position: 'absolute',
