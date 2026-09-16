@@ -17,7 +17,7 @@ import { useCalendar } from '../store/CalendarContext';
 import { format, formatEventTime } from '../utils/date';
 import { slotDurationLabel } from '../utils/findTime';
 import { VOICE_DEMO_PHRASES } from '../utils/voiceParse';
-
+import { PressableScale } from './PressableScale';
 function SheetShell({
   visible,
   onClose,
@@ -152,13 +152,14 @@ function CreateEventSheet() {
           : 'Type it out, or tap the mic and say it.'}
       </Text>
 
-      <Pressable
+      <PressableScale
         style={[styles.primaryBtn, !text.trim() && styles.btnDisabled]}
         onPress={submit}
         disabled={!text.trim()}
+        haptic="light"
       >
         <Text style={styles.primaryBtnText}>Add to calendar</Text>
-      </Pressable>
+      </PressableScale>
     </SheetShell>
   );
 }
@@ -178,14 +179,14 @@ function FindTimeSheet() {
     >
       <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
         {freeSlots.map((slot) => (
-          <Pressable
+          <PressableScale
             key={slot.id}
             style={styles.slotCard}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               createFromSlot(slot, 'Time together');
               closeSheet();
             }}
+            haptic="light"
           >
             <View>
               <Text style={styles.slotDay}>{slot.dayLabel}</Text>
@@ -196,7 +197,7 @@ function FindTimeSheet() {
                 {slotDurationLabel(slot.durationMinutes)}
               </Text>
             </View>
-          </Pressable>
+          </PressableScale>
         ))}
         {!freeSlots.length ? (
           <Text style={styles.empty}>No mutual openings this week — try next week.</Text>
@@ -299,10 +300,11 @@ function RequestsSheet() {
     >
       <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
         {requests.map((r) => (
-          <Pressable
+          <PressableScale
             key={r.id}
             style={styles.requestCard}
             onPress={() => openSheet({ type: 'requestDetail', request: r })}
+            haptic="selection"
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.slotDay}>{r.title}</Text>
@@ -311,7 +313,7 @@ function RequestsSheet() {
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          </PressableScale>
         ))}
       </ScrollView>
     </SheetShell>

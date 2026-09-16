@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AtmosphereBackground, BrandMark } from '../components/Atmosphere';
+import { PressableScale } from '../components/PressableScale';
 import { WeekDayCards } from '../components/WeekCalendar';
 import { SheetsHost } from '../components/Sheets';
 import { useCalendar } from '../store/CalendarContext';
@@ -17,18 +18,31 @@ export function HomeScreen() {
     <AtmosphereBackground>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.header}>
-          <BrandMark />
+          <View style={styles.brandBlock}>
+            <BrandMark />
+            <PressableScale
+              style={[styles.topBtn, styles.topBtnPrimary]}
+              onPress={() => openSheet({ type: 'create' })}
+              haptic="light"
+            >
+              <Ionicons name="add" size={16} color={colors.white} />
+              <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
+            </PressableScale>
+          </View>
+
           <View style={styles.headerActions}>
-            <Pressable
+            <PressableScale
               style={styles.topBtn}
               onPress={() => openSheet({ type: 'findTime' })}
+              haptic="selection"
             >
               <Ionicons name="sparkles-outline" size={15} color={colors.ink} />
               <Text style={styles.topBtnText}>Find time</Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               style={styles.topBtn}
               onPress={() => openSheet({ type: 'requests' })}
+              haptic="selection"
             >
               <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
               <Text style={styles.topBtnText}>Requests</Text>
@@ -37,27 +51,30 @@ export function HomeScreen() {
                   <Text style={styles.badgeText}>{pendingCount}</Text>
                 </View>
               ) : null}
-            </Pressable>
-            <Pressable
-              style={[styles.topBtn, styles.topBtnPrimary]}
-              onPress={() => openSheet({ type: 'create' })}
-            >
-              <Ionicons name="add" size={16} color={colors.white} />
-              <Text style={[styles.topBtnText, styles.topBtnTextPrimary]}>New event</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         </View>
 
-        <View style={styles.subHeader}>
-          <View style={styles.weekNav}>
-            <Pressable onPress={() => goWeek(-1)} hitSlop={12} style={styles.navBtn}>
-              <Ionicons name="chevron-back" size={18} color={colors.ink} />
-            </Pressable>
-            <Text style={styles.weekLabel}>{weekLabel(weekAnchor, today)}</Text>
-            <Pressable onPress={() => goWeek(1)} hitSlop={12} style={styles.navBtn}>
-              <Ionicons name="chevron-forward" size={18} color={colors.ink} />
-            </Pressable>
-          </View>
+        <View style={styles.weekNav}>
+          <PressableScale
+            onPress={() => goWeek(-1)}
+            hitSlop={12}
+            style={styles.navBtn}
+            haptic="selection"
+            scaleTo={0.9}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.ink} />
+          </PressableScale>
+          <Text style={styles.weekLabel}>{weekLabel(weekAnchor, today)}</Text>
+          <PressableScale
+            onPress={() => goWeek(1)}
+            hitSlop={12}
+            style={styles.navBtn}
+            haptic="selection"
+            scaleTo={0.9}
+          >
+            <Ionicons name="chevron-forward" size={18} color={colors.ink} />
+          </PressableScale>
         </View>
 
         <WeekDayCards />
@@ -75,16 +92,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 14,
     gap: 12,
+  },
+  brandBlock: {
+    gap: 10,
+    alignItems: 'flex-start',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingTop: 4,
   },
   topBtn: {
     flexDirection: 'row',
@@ -92,7 +114,7 @@ const styles = StyleSheet.create({
     gap: 5,
     backgroundColor: colors.fill,
     borderRadius: 20,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   topBtnPrimary: {
@@ -120,34 +142,31 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'Poppins_700Bold',
   },
-  subHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginBottom: 10,
-  },
   weekNav: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    justifyContent: 'space-between',
     backgroundColor: colors.fill,
-    borderRadius: 12,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    borderRadius: 14,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    marginBottom: 12,
+    width: '100%',
   },
   weekLabel: {
     ...type.caption,
     color: colors.inkSoft,
-    minWidth: 88,
     textAlign: 'center',
     fontFamily: 'Poppins_500Medium',
-    fontSize: 12,
+    fontSize: 13,
+    flex: 1,
   },
   navBtn: {
-    width: 28,
-    height: 28,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
+    backgroundColor: colors.white,
   },
 });

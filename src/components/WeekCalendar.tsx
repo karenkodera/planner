@@ -16,6 +16,7 @@ import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
 import { useCalendar } from '../store/CalendarContext';
 import { DayDetailModal } from './DayDetailModal';
+import { PressableScale } from './PressableScale';
 import {
   eventTouchesDay,
   format,
@@ -58,10 +59,32 @@ type DayItem =
   | { kind: 'event'; event: CalendarEvent }
   | { kind: 'request'; request: SharedRequest };
 
+function EventLines({
+  time,
+  title,
+  titleStyle,
+  timeStyle,
+}: {
+  time: string;
+  title: string;
+  titleStyle?: object;
+  timeStyle?: object;
+}) {
+  return (
+    <View style={styles.eventText}>
+      <Text style={[styles.planTime, timeStyle]}>{time}</Text>
+      <Text numberOfLines={2} style={[styles.planTitle, titleStyle]}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
 function DayCard({
   day,
   items,
   isToday,
+  index,
   onPress,
   onRequestPress,
 }: {
@@ -69,9 +92,21 @@ function DayCard({
   items: DayItem[];
   selected: boolean;
   isToday: boolean;
+  index: number;
   onPress: () => void;
   onRequestPress: (request: SharedRequest) => void;
 }) {
+  const appear = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(appear, {
+      toValue: 1,
+      duration: 320,
+      delay: index * 45,
+      useNativeDriver: true,
+    }).start();
+  }, [appear, index]);
+
   const mine = items.filter(
     (i) => i.kind === 'event' && i.event.owner === 'me',
   );
@@ -87,121 +122,226 @@ function DayCard({
     && partner.length === 0
     && shared.length === 0
     && dayRequests.length === 0;
-  const showPartnerCol = partner.length > 0 || shared.length > 0;
+
+  const hasWrapCluster = shared.length > 0 && partner.length > 0;
+  const sharedOnly = shared.length > 0 && partner.length === 0;
 
   return (
-    <Pressable onPress={onPress} style={styles.dayRow}>
-      <View
-        style={[
-          styles.mainBox,
-          isToday && styles.dayCardToday,
-          showPartnerCol && styles.mainBoxWithPartner,
-        ]}
-      >
-        <View style={styles.dateCol}>
-          <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
-            {format(day, 'EEE')}
-          </Text>
-          <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
-            {format(day, 'MMM d')}
-          </Text>
-        </View>
+    <Animated.View
+      style={{
+        opacity: appear,
+        transform: [
+          {
+            translateY: appear.interpolate({
+              inputRange: [0, 1],
+              outputRange: [10, 0],
+            }),
+          },
+        ],
+      }}
+    >
+      <PressableScale style={styles.dayCard} onPress={onPress} scaleTo={0.985} haptic="light">
+        <View style={[styles.dayInner, isToday && styles.dayCardToday]}>
+          <View style={styles.dateCol}>
+            <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
+              {format(day, 'EEE')}
+            </Text>
+            <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
+              {format(day, 'MMM d')}
+            </Text>
+          </View>
 
-        <View style={styles.dateDivider} />
+          <View style={styles.dateDivider} />
 
-        <View style={styles.plansCol}>
-          {isEmpty ? <Text style={styles.emptyPlans}>Free evening</Text> : null}
-
-          {mine.map((item) => {
-            if (item.kind !== 'event') return null;
-            const { event } = item;
-            return (
-              <View key={event.id} style={styles.planRow}>
-                <Text style={styles.planTime}>{format(event.start, 'h:mm a')}</Text>
-                <Text numberOfLines={2} style={styles.planTitle}>
-                  {event.title}
-                </Text>
+          <View style={styles.cols}>
+            {isEmpty ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyPlans}>Free evening</Text>
               </View>
-            );
-          })}
+            ) : null}
 
-          {shared.map((item) => {
-            if (item.kind !== 'event') return null;
-            const { event } = item;
-            return (
-              <View key={event.id} style={styles.sharedRow}>
-                <View style={styles.eventText}>
-                  <Text style={styles.planTime}>{format(event.start, 'h:mm a')}</Text>
-                  <Text numberOfLines={2} style={styles.planTitleShared}>
-                    {event.title}
-                  </Text>
+            {/* Solo plans in two columns (when not wrapped into together blob) */}
+            {!hasWrapCluster && (mine.length > 0 || partner.length > 0 || dayRequests.length > 0) ? (
+              <View style={styles.dualRow}>
+                <View style={styles.lane}>
+                  {mine.map((item) => {
+                    if (item.kind !== 'event') return null;
+                    return (
+                      <EventLines
+                        key={item.event.id}
+                        time={format(item.event.start, 'h:mm a')}
+                        title={item.event.title}
+                      />
+                    );
+                  })}
+                  {dayRequests.map((item) => {
+                    if (item.kind !== 'request') return null;
+                    const { request } = item;
+                    return (
+                      <Pressable
+                        key={`req-${request.id}`}
+                        onPress={() => onRequestPress(request)}
+                        style={styles.requestBox}
+                      >
+                        <EventLines
+                          time={format(request.proposedStart, 'h:mm a')}
+                          title={request.title}
+                          titleStyle={styles.requestTitle}
+                        />
+                        <Text style={styles.requestPillText}>Request</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {mine.length === 0 && dayRequests.length === 0 && !sharedOnly ? (
+                    <Text style={styles.emptyPlans}>You’re free</Text>
+                  ) : null}
                 </View>
-                <View style={styles.togetherBadge}>
-                  <TogetherIcon size={14} />
+                <View style={styles.lane}>
+                  {partner.map((item) => {
+                    if (item.kind !== 'event') return null;
+                    return (
+                      <EventLines
+                        key={item.event.id}
+                        time={format(item.event.start, 'h:mm a')}
+                        title={item.event.title}
+                        titleStyle={styles.partnerTitle}
+                        timeStyle={styles.partnerTime}
+                      />
+                    );
+                  })}
                 </View>
               </View>
-            );
-          })}
+            ) : null}
 
-          {dayRequests.map((item) => {
-            if (item.kind !== 'request') return null;
-            const { request } = item;
-            return (
-              <Pressable
-                key={`req-${request.id}`}
-                onPress={() => onRequestPress(request)}
-                style={styles.requestBox}
-              >
-                <View style={styles.requestRowInner}>
-                  <View style={styles.eventText}>
-                    <Text style={styles.planTime}>
-                      {format(request.proposedStart, 'h:mm a')}
-                    </Text>
-                    <Text numberOfLines={2} style={styles.requestTitle}>
-                      {request.title}
-                    </Text>
+            {/* Shared alone — one spanning blob across both columns */}
+            {sharedOnly
+              ? shared.map((item) => {
+                  if (item.kind !== 'event') return null;
+                  const { event } = item;
+                  return (
+                    <View key={event.id} style={styles.togetherBlob}>
+                      <View style={styles.togetherBlobInner}>
+                        <EventLines
+                          time={format(event.start, 'h:mm a')}
+                          title={event.title}
+                          titleStyle={styles.planTitleShared}
+                        />
+                        <View style={styles.togetherBadge}>
+                          <TogetherIcon size={14} />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              : null}
+
+            {/* Shared + partner — melted blob wrapping around partner events */}
+            {hasWrapCluster ? (
+              <View style={styles.togetherWrap}>
+                <View
+                  style={[
+                    styles.wrapTop,
+                    mine.length === 0 && dayRequests.length === 0 && styles.wrapTopPartnerOnly,
+                  ]}
+                >
+                  {mine.length > 0 || dayRequests.length > 0 ? (
+                    <View style={styles.wrapLeft}>
+                      {mine.map((item) => {
+                        if (item.kind !== 'event') return null;
+                        return (
+                          <EventLines
+                            key={item.event.id}
+                            time={format(item.event.start, 'h:mm a')}
+                            title={item.event.title}
+                          />
+                        );
+                      })}
+                      {dayRequests.map((item) => {
+                        if (item.kind !== 'request') return null;
+                        const { request } = item;
+                        return (
+                          <Pressable
+                            key={`req-${request.id}`}
+                            onPress={() => onRequestPress(request)}
+                            style={styles.requestBox}
+                          >
+                            <EventLines
+                              time={format(request.proposedStart, 'h:mm a')}
+                              title={request.title}
+                              titleStyle={styles.requestTitle}
+                            />
+                            <Text style={styles.requestPillText}>Request</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.wrapLeftSpacer} />
+                  )}
+                  <View style={styles.wrapIsland}>
+                    {partner.map((item) => {
+                      if (item.kind !== 'event') return null;
+                      return (
+                        <EventLines
+                          key={item.event.id}
+                          time={format(item.event.start, 'h:mm a')}
+                          title={item.event.title}
+                          titleStyle={styles.partnerTitle}
+                          timeStyle={styles.partnerTime}
+                        />
+                      );
+                    })}
                   </View>
-                  <Text style={styles.requestPillText}>Request</Text>
                 </View>
-              </Pressable>
-            );
-          })}
-
-          {!isEmpty && mine.length === 0 && shared.length === 0 && dayRequests.length === 0 ? (
-            <Text style={styles.emptyPlans}>You’re free</Text>
-          ) : null}
-        </View>
-      </View>
-
-      {showPartnerCol ? (
-        <View style={styles.partnerSide}>
-          {partner.map((item) => {
-            if (item.kind !== 'event') return null;
-            const { event } = item;
-            return (
-              <View key={event.id} style={styles.partnerRow}>
-                <Text style={styles.partnerTime}>{format(event.start, 'h:mm a')}</Text>
-                <Text numberOfLines={2} style={styles.partnerTitle}>
-                  {event.title}
-                </Text>
+                {shared.map((item) => {
+                  if (item.kind !== 'event') return null;
+                  const { event } = item;
+                  return (
+                    <View key={event.id} style={styles.wrapSharedRow}>
+                      <EventLines
+                        time={format(event.start, 'h:mm a')}
+                        title={event.title}
+                        titleStyle={styles.planTitleShared}
+                      />
+                      <View style={styles.togetherBadge}>
+                        <TogetherIcon size={14} />
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
-            );
-          })}
-          {shared.map((item) => {
-            if (item.kind !== 'event') return null;
-            const { event } = item;
-            return (
-              <View key={`t-${event.id}`} style={styles.partnerSharedBox}>
-                <Text style={styles.partnerTime}>{format(event.start, 'h:mm a')}</Text>
-                <Text numberOfLines={2} style={styles.partnerSharedTitle}>
-                  {event.title}
-                </Text>
+            ) : null}
+
+            {/* Shared-only day still needs requests under blob */}
+            {sharedOnly && dayRequests.length > 0 ? (
+              <View style={styles.dualRow}>
+                <View style={styles.lane}>
+                  {dayRequests.map((item) => {
+                    if (item.kind !== 'request') return null;
+                    const { request } = item;
+                    return (
+                      <Pressable
+                        key={`req-${request.id}`}
+                        onPress={() => onRequestPress(request)}
+                        style={styles.requestBox}
+                      >
+                        <EventLines
+                          time={format(request.proposedStart, 'h:mm a')}
+                          title={request.title}
+                          titleStyle={styles.requestTitle}
+                        />
+                        <Text style={styles.requestPillText}>Request</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={styles.lane} />
               </View>
-            );
-          })}
+            ) : null}
+          </View>
         </View>
-      ) : null}
-    </Pressable>
+      </PressableScale>
+    </Animated.View>
   );
 }
 
@@ -214,6 +354,7 @@ export function WeekDayCards() {
     requests,
     today,
     openSheet,
+    couple,
   } = useCalendar();
   const [monthOpen, setMonthOpen] = useState(false);
   const [dayDetailOpen, setDayDetailOpen] = useState(false);
@@ -236,7 +377,6 @@ export function WeekDayCards() {
       .filter((r) => {
         if (r.status !== 'pending' && r.status !== 'suggested') return false;
         if (!dfIsSameDay(r.proposedStart, day)) return false;
-        // Don't show a request that overlaps something you already have planned
         return !myBusy.some((e) =>
           overlaps(e.start, e.end, r.proposedStart, r.proposedEnd),
         );
@@ -254,22 +394,31 @@ export function WeekDayCards() {
     setSelectedDay(day);
     setDetailDay(day);
     setDayDetailOpen(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   return (
     <View style={styles.weekWrap}>
+      <View style={styles.colHeaders}>
+        <View style={styles.dateColSpacer} />
+        <View style={styles.colHeaderDivider} />
+        <View style={styles.colHeaderLanes}>
+          <Text style={styles.colHeaderText}>{couple.me.name}</Text>
+          <Text style={styles.colHeaderText}>{couple.partner.name}</Text>
+        </View>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.weekStack}
       >
-        {days.map((day) => (
+        {days.map((day, index) => (
           <DayCard
             key={day.toISOString()}
             day={day}
             items={itemsForDay(day)}
             selected={isSameDay(day, selectedDay)}
             isToday={isSameDay(day, today)}
+            index={index}
             onPress={() => openDayDetail(day)}
             onRequestPress={(request) =>
               openSheet({ type: 'requestDetail', request })
@@ -277,16 +426,14 @@ export function WeekDayCards() {
           />
         ))}
 
-        <Pressable
+        <PressableScale
           style={styles.monthButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setMonthOpen(true);
-          }}
+          onPress={() => setMonthOpen(true)}
+          haptic="light"
         >
           <Ionicons name="calendar-outline" size={18} color={colors.white} />
           <Text style={styles.monthButtonText}>Calendar view</Text>
-        </Pressable>
+        </PressableScale>
       </ScrollView>
 
       <MonthViewModal
@@ -309,7 +456,7 @@ function MonthViewModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const { weekAnchor, selectedDay, events, requests, today, jumpToDay, couple } =
+  const { weekAnchor, selectedDay, events, today, jumpToDay, couple } =
     useCalendar();
   const [monthAnchor, setMonthAnchor] = useState(weekAnchor);
   const slide = useRef(new Animated.Value(480)).current;
@@ -345,21 +492,29 @@ function MonthViewModal({
         <Animated.View style={[styles.monthSheet, { transform: [{ translateY: slide }] }]}>
           <View style={styles.monthHandle} />
           <View style={styles.monthHeader}>
-            <Pressable
+            <PressableScale
               hitSlop={12}
-              onPress={() => setMonthAnchor((d) => addMonths(d, -1))}
+              onPress={() => {
+                setMonthAnchor((d) => addMonths(d, -1));
+              }}
               style={styles.monthNavBtn}
+              haptic="selection"
+              scaleTo={0.9}
             >
               <Ionicons name="chevron-back" size={20} color={colors.ink} />
-            </Pressable>
+            </PressableScale>
             <Text style={styles.monthTitle}>{formatDate(monthAnchor, 'MMMM yyyy')}</Text>
-            <Pressable
+            <PressableScale
               hitSlop={12}
-              onPress={() => setMonthAnchor((d) => addMonths(d, 1))}
+              onPress={() => {
+                setMonthAnchor((d) => addMonths(d, 1));
+              }}
               style={styles.monthNavBtn}
+              haptic="selection"
+              scaleTo={0.9}
             >
               <Ionicons name="chevron-forward" size={20} color={colors.ink} />
-            </Pressable>
+            </PressableScale>
           </View>
 
           <View style={styles.dowRow}>
@@ -423,9 +578,9 @@ function MonthViewModal({
             })}
           </View>
 
-          <Pressable style={styles.monthClose} onPress={onClose}>
+          <PressableScale style={styles.monthClose} onPress={onClose} haptic="light">
             <Text style={styles.monthCloseText}>Done</Text>
-          </Pressable>
+          </PressableScale>
         </Animated.View>
       </View>
     </Modal>
@@ -435,30 +590,49 @@ function MonthViewModal({
 const styles = StyleSheet.create({
   weekWrap: {
     flex: 1,
-    marginTop: 4,
+    marginTop: 2,
+  },
+  colHeaders: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 14,
+  },
+  dateColSpacer: {
+    width: 64,
+  },
+  colHeaderDivider: {
+    width: StyleSheet.hairlineWidth,
+    marginHorizontal: 12,
+  },
+  colHeaderLanes: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  colHeaderText: {
+    flex: 1,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 12,
+    color: colors.muted,
+    letterSpacing: 0.2,
   },
   weekStack: {
     gap: 10,
     paddingBottom: 28,
-    paddingTop: 4,
+    paddingTop: 2,
   },
-  dayRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 10,
+  dayCard: {
+    borderRadius: 18,
   },
-  mainBox: {
-    flex: 1,
+  dayInner: {
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: colors.canvasElevated,
     borderRadius: 18,
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 14,
     minHeight: 88,
-  },
-  mainBoxWithPartner: {
-    flex: 1.35,
   },
   dayCardToday: {
     borderWidth: 1.5,
@@ -496,10 +670,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     alignSelf: 'stretch',
   },
-  plansCol: {
+  cols: {
     flex: 1,
-    justifyContent: 'center',
     gap: 8,
+    justifyContent: 'center',
+  },
+  emptyWrap: {
+    paddingVertical: 4,
+  },
+  dualRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  lane: {
+    flex: 1,
+    gap: 8,
+    justifyContent: 'center',
   },
   emptyPlans: {
     fontFamily: 'Poppins_400Regular',
@@ -508,16 +694,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   eventText: {
+    gap: 2,
     flex: 1,
-    gap: 2,
-  },
-  planRow: {
-    gap: 2,
-  },
-  sharedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   planTime: {
     fontFamily: 'Poppins_500Medium',
@@ -534,16 +712,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.ink,
   },
-  partnerSide: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    gap: 8,
-  },
-  partnerRow: {
-    gap: 2,
-  },
   partnerTime: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
@@ -554,17 +722,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkSoft,
   },
-  partnerSharedBox: {
-    backgroundColor: colors.canvasElevated,
-    borderRadius: 10,
+  togetherBlob: {
+    backgroundColor: colors.sharedSoft,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  togetherBlobInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  togetherWrap: {
+    backgroundColor: colors.sharedSoft,
+    borderRadius: 16,
+    padding: 10,
+    gap: 8,
+  },
+  wrapTop: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'stretch',
+  },
+  wrapTopPartnerOnly: {
+    justifyContent: 'flex-end',
+  },
+  wrapLeft: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  wrapLeftSpacer: {
+    flex: 1,
+  },
+  wrapIsland: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    gap: 2,
+    gap: 6,
   },
-  partnerSharedTitle: {
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 13,
-    color: colors.inkSoft,
+  wrapSharedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 2,
   },
   requestBox: {
     borderRadius: 10,
@@ -574,11 +777,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: 'transparent',
-  },
-  requestRowInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   requestTitle: {
     fontFamily: 'Poppins_500Medium',
@@ -594,7 +793,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.sharedSoft,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
