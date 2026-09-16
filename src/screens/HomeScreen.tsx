@@ -48,14 +48,14 @@ export function HomeScreen() {
   const [requestsOpen, setRequestsOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const searchAnim = useRef(new Animated.Value(0)).current;
   const weekPulse = useRef(new Animated.Value(1)).current;
   const drawerAnim = useRef(new Animated.Value(0)).current;
+  const searchSlide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(drawerAnim, {
       toValue: requestsOpen ? 1 : 0,
-      duration: 280,
+      duration: 260,
       easing: requestsOpen
         ? Easing.out(Easing.cubic)
         : Easing.in(Easing.cubic),
@@ -65,41 +65,39 @@ export function HomeScreen() {
 
   const openSearch = () => {
     if (requestsOpen) setRequestsOpen(false);
-    setSearchOpen(true);
     setQuery('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    searchAnim.setValue(0);
-    Animated.timing(searchAnim, {
-      toValue: 1,
-      duration: 260,
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        200,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+    setSearchOpen(true);
+    searchSlide.setValue(10);
+    Animated.timing(searchSlide, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   };
 
   const closeSearch = () => {
     Haptics.selectionAsync();
-    Animated.timing(searchAnim, {
-      toValue: 0,
-      duration: 200,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        setSearchOpen(false);
-        setQuery('');
-      }
-    });
-  };
-
-  const toggleRequests = () => {
     LayoutAnimation.configureNext(
       LayoutAnimation.create(
-        280,
+        180,
         LayoutAnimation.Types.easeInEaseOut,
         LayoutAnimation.Properties.opacity,
       ),
     );
+    setSearchOpen(false);
+    setQuery('');
+  };
+
+  const toggleRequests = () => {
     Haptics.selectionAsync();
     setRequestsOpen((v) => !v);
   };
@@ -145,46 +143,51 @@ export function HomeScreen() {
     [requests],
   );
 
-  const actionsOpacity = searchAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-  const actionsScale = searchAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.96],
-  });
-  const searchOpacity = searchAnim;
-  const searchTranslate = searchAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [8, 0],
-  });
-  const searchScale = searchAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.98, 1],
-  });
-
   const drawerMaxHeight = drawerAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, Math.min(280, 56 + activeRequests.length * 72)],
-  });
-  const drawerOpacity = drawerAnim.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 0.4, 1],
   });
 
   return (
     <AtmosphereBackground>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.header}>
-          {!searchOpen ? (
+          {searchOpen ? (
             <Animated.View
               style={[
-                styles.actionRow,
-                { opacity: actionsOpacity, transform: [{ scale: actionsScale }] },
+                styles.searchRow,
+                { transform: [{ translateY: searchSlide }] },
               ]}
-              pointerEvents="auto"
             >
-              <View style={styles.requestsTabWrap}>
+              <View style={styles.searchField}>
+                <Ionicons name="search" size={18} color={colors.muted} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search plans…"
+                  placeholderTextColor={colors.muted}
+                  style={styles.searchInput}
+                  autoFocus
+                  returnKeyType="search"
+                />
+                {query.length > 0 ? (
+                  <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                    <Ionicons name="close-circle" size={18} color={colors.muted} />
+                  </Pressable>
+                ) : null}
+              </View>
+              <PressableScale
+                style={styles.searchCancel}
+                onPress={closeSearch}
+                haptic="selection"
+                scaleTo={0.94}
+              >
+                <Text style={styles.searchCancelText}>Cancel</Text>
+              </PressableScale>
+            </Animated.View>
+          ) : (
+            <View style={styles.actionRow}>
+              <View style={styles.cabinet}>
                 <PressableScale
                   style={[
                     styles.topBtn,
@@ -207,6 +210,49 @@ export function HomeScreen() {
                     color={colors.muted}
                   />
                 </PressableScale>
+
+                <Animated.View
+                  style={[
+                    styles.requestsDrawer,
+                    { maxHeight: drawerMaxHeight },
+                  ]}
+                  pointerEvents={requestsOpen ? 'auto' : 'none'}
+                >
+                  <View style={styles.requestsDrawerInner}>
+                    <ScrollView
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                      style={styles.requestsDrawerScroll}
+                    >
+                      {activeRequests.map((request) => (
+                        <PressableScale
+                          key={request.id}
+                          style={styles.drawerRow}
+                          onPress={() => {
+                            setRequestsOpen(false);
+                            openSheet({ type: 'requestDetail', request });
+                          }}
+                          haptic="selection"
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.drawerTitle}>{request.title}</Text>
+                            <Text style={styles.drawerMeta}>
+                              {format(request.proposedStart, 'EEE · h:mm a')}
+                              {' · '}
+                              {request.from === 'me'
+                                ? 'Awaiting reply'
+                                : `From ${couple.partner.name} · RSVP`}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                        </PressableScale>
+                      ))}
+                      {!activeRequests.length ? (
+                        <Text style={styles.drawerEmpty}>Nothing needs a reply</Text>
+                      ) : null}
+                    </ScrollView>
+                  </View>
+                </Animated.View>
               </View>
 
               <View style={styles.iconGroup}>
@@ -237,46 +283,7 @@ export function HomeScreen() {
                   <Ionicons name="search" size={18} color={colors.ink} />
                 </PressableScale>
               </View>
-            </Animated.View>
-          ) : (
-            <Animated.View
-              style={[
-                styles.searchRow,
-                {
-                  opacity: searchOpacity,
-                  transform: [
-                    { scale: searchScale },
-                    { translateY: searchTranslate },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.searchField}>
-                <Ionicons name="search" size={18} color={colors.muted} />
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search plans…"
-                  placeholderTextColor={colors.muted}
-                  style={styles.searchInput}
-                  autoFocus
-                  returnKeyType="search"
-                />
-                {query.length > 0 ? (
-                  <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                    <Ionicons name="close-circle" size={18} color={colors.muted} />
-                  </Pressable>
-                ) : null}
-              </View>
-              <PressableScale
-                style={styles.searchCancel}
-                onPress={closeSearch}
-                haptic="selection"
-                scaleTo={0.94}
-              >
-                <Text style={styles.searchCancelText}>Cancel</Text>
-              </PressableScale>
-            </Animated.View>
+            </View>
           )}
         </View>
 
@@ -338,56 +345,6 @@ export function HomeScreen() {
 
         <Animated.View
           style={[
-            styles.requestsDrawer,
-            {
-              maxHeight: drawerMaxHeight,
-              opacity: drawerOpacity,
-              marginBottom: drawerAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 10],
-              }),
-            },
-          ]}
-          pointerEvents={requestsOpen ? 'auto' : 'none'}
-        >
-          <View style={styles.requestsDrawerInner}>
-            <ScrollView
-              nestedScrollEnabled
-              showsVerticalScrollIndicator={false}
-              style={styles.requestsDrawerScroll}
-            >
-              {activeRequests.map((request) => (
-                <PressableScale
-                  key={request.id}
-                  style={styles.drawerRow}
-                  onPress={() => {
-                    setRequestsOpen(false);
-                    openSheet({ type: 'requestDetail', request });
-                  }}
-                  haptic="selection"
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.drawerTitle}>{request.title}</Text>
-                    <Text style={styles.drawerMeta}>
-                      {format(request.proposedStart, 'EEE · h:mm a')}
-                      {' · '}
-                      {request.from === 'me'
-                        ? 'Awaiting reply'
-                        : `From ${couple.partner.name} · RSVP`}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-                </PressableScale>
-              ))}
-              {!activeRequests.length ? (
-                <Text style={styles.drawerEmpty}>Nothing needs a reply</Text>
-              ) : null}
-            </ScrollView>
-          </View>
-        </Animated.View>
-
-        <Animated.View
-          style={[
             styles.weekNav,
             {
               transform: [{ scale: weekPulse }],
@@ -434,25 +391,27 @@ const styles = StyleSheet.create({
   },
   header: {
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 10,
     minHeight: 44,
     justifyContent: 'center',
   },
   actionRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     gap: 8,
   },
-  requestsTabWrap: {
+  cabinet: {
     flexShrink: 1,
+    backgroundColor: colors.fill,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   requestsTab: {
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    alignSelf: 'flex-start',
   },
   requestsTabOpen: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
     paddingBottom: 10,
   },
   iconGroup: {
@@ -462,6 +421,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.fill,
     borderRadius: 12,
     overflow: 'hidden',
+    height: 40,
   },
   iconBtn: {
     width: 40,
@@ -489,7 +449,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.fill,
     borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 44,
   },
   searchInput: {
     flex: 1,
@@ -497,6 +457,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
     padding: 0,
+    margin: 0,
   },
   searchCancel: {
     paddingVertical: 8,
@@ -600,13 +561,9 @@ const styles = StyleSheet.create({
   requestsDrawer: {
     overflow: 'hidden',
     backgroundColor: colors.fill,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 16,
   },
   requestsDrawerInner: {
-    paddingTop: 4,
+    paddingTop: 0,
     paddingBottom: 8,
   },
   requestsDrawerScroll: {
