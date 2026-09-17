@@ -48,6 +48,7 @@ export function HomeScreen() {
   const [requestsOpen, setRequestsOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [drawerContentH, setDrawerContentH] = useState(120);
   const weekPulse = useRef(new Animated.Value(1)).current;
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const searchSlide = useRef(new Animated.Value(0)).current;
@@ -143,9 +144,9 @@ export function HomeScreen() {
     [requests],
   );
 
-  const drawerMaxHeight = drawerAnim.interpolate({
+  const drawerHeight = drawerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, Math.min(280, 56 + activeRequests.length * 72)],
+    outputRange: [0, Math.max(drawerContentH, 1)],
   });
 
   return (
@@ -186,12 +187,11 @@ export function HomeScreen() {
               </PressableScale>
             </Animated.View>
           ) : (
-            <View style={styles.actionRow}>
-              <View style={styles.cabinet}>
+            <View>
+              <View style={styles.actionRow}>
                 <PressableScale
                   style={[
                     styles.topBtn,
-                    styles.requestsTab,
                     requestsOpen && styles.requestsTabOpen,
                   ]}
                   onPress={toggleRequests}
@@ -211,78 +211,86 @@ export function HomeScreen() {
                   />
                 </PressableScale>
 
-                <Animated.View
-                  style={[
-                    styles.requestsDrawer,
-                    { maxHeight: drawerMaxHeight },
-                  ]}
-                  pointerEvents={requestsOpen ? 'auto' : 'none'}
-                >
-                  <View style={styles.requestsDrawerInner}>
-                    <ScrollView
-                      nestedScrollEnabled
-                      showsVerticalScrollIndicator={false}
-                      style={styles.requestsDrawerScroll}
-                    >
-                      {activeRequests.map((request) => (
-                        <PressableScale
-                          key={request.id}
-                          style={styles.drawerRow}
-                          onPress={() => {
-                            setRequestsOpen(false);
-                            openSheet({ type: 'requestDetail', request });
-                          }}
-                          haptic="selection"
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.drawerTitle}>{request.title}</Text>
-                            <Text style={styles.drawerMeta}>
-                              {format(request.proposedStart, 'EEE · h:mm a')}
-                              {' · '}
-                              {request.from === 'me'
-                                ? 'Awaiting reply'
-                                : `From ${couple.partner.name} · RSVP`}
-                            </Text>
-                          </View>
-                          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-                        </PressableScale>
-                      ))}
-                      {!activeRequests.length ? (
-                        <Text style={styles.drawerEmpty}>Nothing needs a reply</Text>
-                      ) : null}
-                    </ScrollView>
-                  </View>
-                </Animated.View>
+                <View style={styles.iconGroup}>
+                  <PressableScale
+                    style={[styles.iconBtn, styles.iconBtnLeft]}
+                    onPress={() => setMonthOpen(true)}
+                    haptic="selection"
+                    scaleTo={0.9}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color={colors.ink} />
+                  </PressableScale>
+                  <View style={styles.iconDivider} />
+                  <PressableScale
+                    style={styles.iconBtn}
+                    onPress={() => openSheet({ type: 'create' })}
+                    haptic="light"
+                    scaleTo={0.9}
+                  >
+                    <Ionicons name="add" size={20} color={colors.ink} />
+                  </PressableScale>
+                  <View style={styles.iconDivider} />
+                  <PressableScale
+                    style={[styles.iconBtn, styles.iconBtnRight]}
+                    onPress={openSearch}
+                    haptic="selection"
+                    scaleTo={0.9}
+                  >
+                    <Ionicons name="search" size={18} color={colors.ink} />
+                  </PressableScale>
+                </View>
               </View>
 
-              <View style={styles.iconGroup}>
-                <PressableScale
-                  style={[styles.iconBtn, styles.iconBtnLeft]}
-                  onPress={() => setMonthOpen(true)}
-                  haptic="selection"
-                  scaleTo={0.9}
+              <Animated.View
+                style={[
+                  styles.requestsDrawer,
+                  {
+                    height: drawerHeight,
+                    marginBottom: drawerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 10],
+                    }),
+                  },
+                ]}
+                pointerEvents={requestsOpen ? 'auto' : 'none'}
+              >
+                <View
+                  style={styles.requestsDrawerInner}
+                  onLayout={(e) => {
+                    const h = e.nativeEvent.layout.height;
+                    if (h > 0 && Math.abs(h - drawerContentH) > 1) {
+                      setDrawerContentH(h);
+                    }
+                  }}
                 >
-                  <Ionicons name="calendar-outline" size={18} color={colors.ink} />
-                </PressableScale>
-                <View style={styles.iconDivider} />
-                <PressableScale
-                  style={styles.iconBtn}
-                  onPress={() => openSheet({ type: 'create' })}
-                  haptic="light"
-                  scaleTo={0.9}
-                >
-                  <Ionicons name="add" size={20} color={colors.ink} />
-                </PressableScale>
-                <View style={styles.iconDivider} />
-                <PressableScale
-                  style={[styles.iconBtn, styles.iconBtnRight]}
-                  onPress={openSearch}
-                  haptic="selection"
-                  scaleTo={0.9}
-                >
-                  <Ionicons name="search" size={18} color={colors.ink} />
-                </PressableScale>
-              </View>
+                  {activeRequests.map((request) => (
+                    <PressableScale
+                      key={request.id}
+                      style={styles.drawerRow}
+                      onPress={() => {
+                        setRequestsOpen(false);
+                        openSheet({ type: 'requestDetail', request });
+                      }}
+                      haptic="selection"
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.drawerTitle}>{request.title}</Text>
+                        <Text style={styles.drawerMeta}>
+                          {format(request.proposedStart, 'EEE · h:mm a')}
+                          {' · '}
+                          {request.from === 'me'
+                            ? 'Awaiting reply'
+                            : `From ${couple.partner.name} · RSVP`}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                    </PressableScale>
+                  ))}
+                  {!activeRequests.length ? (
+                    <Text style={styles.drawerEmpty}>Nothing needs a reply</Text>
+                  ) : null}
+                </View>
+              </Animated.View>
             </View>
           )}
         </View>
@@ -397,22 +405,8 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
-  },
-  cabinet: {
-    flexShrink: 1,
-    backgroundColor: colors.fill,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  requestsTab: {
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    alignSelf: 'flex-start',
-  },
-  requestsTabOpen: {
-    paddingBottom: 10,
   },
   iconGroup: {
     marginLeft: 'auto',
@@ -506,6 +500,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    zIndex: 2,
+  },
+  requestsTabOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    marginBottom: 0,
+    paddingBottom: 12,
   },
   topBtnText: {
     fontFamily: 'Poppins_500Medium',
@@ -559,15 +560,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   requestsDrawer: {
+    width: '100%',
     overflow: 'hidden',
     backgroundColor: colors.fill,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderTopRightRadius: 16,
+    marginTop: -1,
   },
   requestsDrawerInner: {
-    paddingTop: 0,
-    paddingBottom: 8,
-  },
-  requestsDrawerScroll: {
-    maxHeight: 260,
+    paddingTop: 4,
+    paddingBottom: 10,
+    paddingHorizontal: 6,
   },
   drawerRow: {
     flexDirection: 'row',
@@ -575,8 +579,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginHorizontal: 6,
-    marginVertical: 2,
+    marginVertical: 3,
     backgroundColor: colors.white,
     borderRadius: 12,
   },
