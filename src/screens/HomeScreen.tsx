@@ -54,13 +54,18 @@ export function HomeScreen() {
 
   const activeRequests = useMemo(
     () =>
-      requests.filter((r) => r.status === 'pending' || r.status === 'suggested'),
+      requests.filter(
+        (r) =>
+          r.from === 'partner'
+          && (r.status === 'pending' || r.status === 'suggested'),
+      ),
     [requests],
   );
 
   const drawerOpenHeight = useMemo(() => {
-    if (!activeRequests.length) return 56;
-    return 14 + activeRequests.length * 70;
+    if (!activeRequests.length) return 64;
+    // 14 pad × 2 + rows (~72) + gaps (8)
+    return 28 + activeRequests.length * 72 + Math.max(0, activeRequests.length - 1) * 8;
   }, [activeRequests.length]);
 
   useEffect(() => {
@@ -201,7 +206,7 @@ export function HomeScreen() {
                   onPress={toggleRequests}
                   haptic="selection"
                 >
-                  <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
+                  <Ionicons name="swap-horizontal" size={17} color={colors.ink} />
                   <Text style={styles.topBtnText}>Requests</Text>
                   {pendingCount > 0 ? (
                     <View style={styles.badge}>
@@ -210,21 +215,20 @@ export function HomeScreen() {
                   ) : null}
                   <Ionicons
                     name={requestsOpen ? 'chevron-up' : 'chevron-down'}
-                    size={14}
+                    size={15}
                     color={colors.muted}
                   />
                 </PressableScale>
 
                 <View style={styles.iconGroup}>
                   <PressableScale
-                    style={[styles.iconBtn, styles.iconBtnLeft]}
+                    style={styles.iconBtn}
                     onPress={() => setMonthOpen(true)}
                     haptic="selection"
                     scaleTo={0.9}
                   >
                     <Ionicons name="calendar-outline" size={18} color={colors.ink} />
                   </PressableScale>
-                  <View style={styles.iconDivider} />
                   <PressableScale
                     style={styles.iconBtn}
                     onPress={() => openSheet({ type: 'create' })}
@@ -233,9 +237,8 @@ export function HomeScreen() {
                   >
                     <Ionicons name="add" size={20} color={colors.ink} />
                   </PressableScale>
-                  <View style={styles.iconDivider} />
                   <PressableScale
-                    style={[styles.iconBtn, styles.iconBtnRight]}
+                    style={styles.iconBtn}
                     onPress={openSearch}
                     haptic="selection"
                     scaleTo={0.9}
@@ -273,10 +276,7 @@ export function HomeScreen() {
                         <Text style={styles.drawerTitle}>{request.title}</Text>
                         <Text style={styles.drawerMeta}>
                           {format(request.proposedStart, 'EEE · h:mm a')}
-                          {' · '}
-                          {request.from === 'me'
-                            ? 'Awaiting reply'
-                            : `From ${couple.partner.name} · RSVP`}
+                          {` · From ${couple.partner.name}`}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={16} color={colors.muted} />
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
   },
   iconGroup: {
@@ -409,22 +409,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.fill,
-    borderRadius: 12,
+    borderRadius: 999,
     overflow: 'hidden',
-    height: 40,
+    height: 38,
+    paddingHorizontal: 2,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconBtnLeft: {},
-  iconBtnRight: {},
-  iconDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 22,
-    backgroundColor: 'rgba(60, 60, 67, 0.28)',
   },
   searchRow: {
     flexDirection: 'row',
@@ -491,22 +485,21 @@ const styles = StyleSheet.create({
   topBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: colors.fill,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     zIndex: 2,
   },
   requestsTabOpen: {
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    marginBottom: 0,
-    paddingBottom: 12,
+    paddingBottom: 18,
   },
   topBtnText: {
     fontFamily: 'Poppins_500Medium',
-    fontSize: 12,
+    fontSize: 13,
     color: colors.ink,
   },
   badge: {
@@ -562,20 +555,18 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
     borderTopRightRadius: 16,
-    marginTop: -1,
+    borderTopLeftRadius: 0,
   },
   requestsDrawerInner: {
-    paddingTop: 4,
-    paddingBottom: 10,
-    paddingHorizontal: 6,
+    padding: 14,
+    gap: 8,
   },
   drawerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginVertical: 3,
+    paddingVertical: 14,
     backgroundColor: colors.white,
     borderRadius: 12,
   },
@@ -595,7 +586,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted,
     fontStyle: 'italic',
-    paddingHorizontal: 16,
-    paddingVertical: 18,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
   },
 });

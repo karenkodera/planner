@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +21,7 @@ import { format, formatEventTime } from '../utils/date';
 import { slotDurationLabel } from '../utils/findTime';
 import { VOICE_DEMO_PHRASES } from '../utils/voiceParse';
 import { PressableScale } from './PressableScale';
+
 function SheetShell({
   visible,
   onClose,
@@ -33,6 +36,7 @@ function SheetShell({
   subtitle?: string;
 }) {
   const slide = useRef(new Animated.Value(520)).current;
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
@@ -45,9 +49,28 @@ function SheetShell({
     }).start();
   }, [visible, slide]);
 
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardOffset(0);
+      return;
+    }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardOffset(e.endCoordinates.height);
+    });
+    const onHide = Keyboard.addListener(hideEvent, () => {
+      setKeyboardOffset(0);
+    });
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [visible]);
+
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { paddingBottom: keyboardOffset }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }] }]}>
           <View style={styles.handle} />
@@ -129,47 +152,8 @@ function CreateEventSheet() {
         style={styles.createScroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       >
-        <View style={styles.composeRow}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder="Tell us what you’re doing at what time on what date with who and we’ll put it in the calendar."
-            placeholderTextColor={colors.muted}
-            style={styles.composeInput}
-            multiline
-            textAlignVertical="top"
-          />
-          <Animated.View style={{ transform: [{ scale: pulse }] }}>
-            <Pressable
-              onPress={startListening}
-              style={[styles.micBtn, listening && styles.micBtnOn]}
-              accessibilityLabel="Dictate with microphone"
-            >
-              <Ionicons
-                name={listening ? 'mic' : 'mic-outline'}
-                size={22}
-                color={listening ? colors.white : colors.ink}
-              />
-            </Pressable>
-          </Animated.View>
-        </View>
-
-        <Text style={styles.composeHint}>
-          {listening
-            ? 'Listening…'
-            : 'Type it out, or tap the mic and say it.'}
-        </Text>
-
-        <PressableScale
-          style={[styles.primaryBtn, !text.trim() && styles.btnDisabled]}
-          onPress={submit}
-          disabled={!text.trim()}
-          haptic="light"
-        >
-          <Text style={styles.primaryBtnText}>Add to calendar</Text>
-        </PressableScale>
-
         <View style={styles.findTimeBlock}>
           <PressableScale
             style={styles.findTimeToggle}
@@ -219,6 +203,40 @@ function CreateEventSheet() {
             </View>
           ) : null}
         </View>
+
+        <View style={styles.composeRow}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Tell us what you’re doing at what time on what date with who and we’ll put it in the calendar."
+            placeholderTextColor={colors.muted}
+            style={styles.composeInput}
+            multiline
+            textAlignVertical="top"
+          />
+          <Animated.View style={{ transform: [{ scale: pulse }] }}>
+            <Pressable
+              onPress={startListening}
+              style={[styles.micBtn, listening && styles.micBtnOn]}
+              accessibilityLabel="Dictate with microphone"
+            >
+              <Ionicons
+                name={listening ? 'mic' : 'mic-outline'}
+                size={22}
+                color={listening ? colors.white : colors.ink}
+              />
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        <PressableScale
+          style={[styles.primaryBtn, !text.trim() && styles.btnDisabled]}
+          onPress={submit}
+          disabled={!text.trim()}
+          haptic="light"
+        >
+          <Text style={styles.primaryBtnText}>Add to calendar</Text>
+        </PressableScale>
       </ScrollView>
     </SheetShell>
   );
@@ -390,23 +408,39 @@ function RequestsSheet() {
   if (detail) {
     const start = detail.suggestedStart ?? detail.proposedStart;
     const end = detail.suggestedEnd ?? detail.proposedEnd;
+    const fromPartner = detail.from === 'partner';
+    const speakerInitial = fromPartner
+      ? couple.partner.initial
+      : couple.me.initial;
     return (
       <SheetShell
         visible
         onClose={closeSheet}
         title={detail.title}
-        subtitle={`From ${detail.from === 'me' ? 'you' : couple.partner.name}`}
+        subtitle={`From ${fromPartner ? couple.partner.name : 'you'}`}
       >
         <Text style={styles.detailTime}>{formatEventTime(start, end)}</Text>
-        {detail.location ? <Text style={styles.detailMeta}>{detail.location}</Text> : null}
-        {detail.notes ? <Text style={styles.detailNotes}>{detail.notes}</Text> : null}
+        {detail.location ? (
+          <View style={styles.detailLocationRow}>
+            <Ionicons name="location-outline" size={15} color={colors.ink} />
+            <Text style={styles.detailMeta}>{detail.location}</Text>
+          </View>
+        ) : null}
+        {detail.notes ? (
+          <View style={styles.detailNotesRow}>
+            <View style={styles.noteInitial}>
+              <Text style={styles.noteInitialText}>{speakerInitial}</Text>
+            </View>
+            <Text style={styles.detailNotes}>{detail.notes}</Text>
+          </View>
+        ) : null}
         {detail.status === 'suggested' && detail.suggestedStart ? (
           <Text style={styles.previewNote}>
             Suggested alternate: {formatEventTime(detail.suggestedStart, detail.suggestedEnd!)}
           </Text>
         ) : null}
 
-        {detail.status === 'pending' && detail.from === 'partner' ? (
+        {detail.status === 'pending' && fromPartner ? (
           <View style={styles.rowBtns}>
             <Pressable
               style={[styles.secondaryBtn, { flex: 1 }]}
@@ -429,9 +463,15 @@ function RequestsSheet() {
           </View>
         ) : null}
 
-        {detail.status === 'pending' && detail.from === 'partner' ? (
-          <Pressable style={styles.ghostBtn} onPress={() => declineRequest(detail.id)}>
-            <Text style={styles.ghostBtnText}>Decline</Text>
+        {detail.status === 'pending' && fromPartner ? (
+          <Pressable
+            style={styles.ghostBtn}
+            onPress={() => {
+              declineRequest(detail.id);
+              closeSheet();
+            }}
+          >
+            <Text style={styles.declineBtnText}>Decline</Text>
           </Pressable>
         ) : null}
 
@@ -447,9 +487,17 @@ function RequestsSheet() {
           </Pressable>
         ) : null}
 
-        <Pressable style={styles.ghostBtn} onPress={() => openSheet({ type: 'requests' })}>
-          <Text style={styles.ghostBtnText}>Back to requests</Text>
-        </Pressable>
+        {detail.status === 'pending' && detail.from === 'me' ? (
+          <Pressable
+            style={styles.ghostBtn}
+            onPress={() => {
+              declineRequest(detail.id);
+              closeSheet();
+            }}
+          >
+            <Text style={styles.declineBtnText}>Cancel invite</Text>
+          </Pressable>
+        ) : null}
       </SheetShell>
     );
   }
@@ -508,12 +556,15 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     ...type.title,
+    fontSize: 20,
+    lineHeight: 26,
     color: colors.ink,
+    marginBottom: 14,
   },
   sheetSub: {
     ...type.body,
     color: colors.muted,
-    marginTop: 4,
+    marginTop: -6,
     marginBottom: 16,
   },
   detailTime: {
@@ -523,13 +574,39 @@ const styles = StyleSheet.create({
   },
   detailMeta: {
     ...type.bodyMedium,
-    color: colors.partnerDeep,
+    color: colors.ink,
+    flexShrink: 1,
+  },
+  detailLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 8,
+  },
+  detailNotesRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 16,
+  },
+  noteInitial: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.partnerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  noteInitialText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 11,
+    color: colors.partnerDeep,
   },
   detailNotes: {
     ...type.body,
     color: colors.inkSoft,
-    marginBottom: 16,
+    flex: 1,
   },
   input: {
     ...type.body,
@@ -570,12 +647,6 @@ const styles = StyleSheet.create({
   },
   micBtnOn: {
     backgroundColor: colors.accent,
-  },
-  composeHint: {
-    ...type.caption,
-    color: colors.muted,
-    marginTop: 10,
-    marginBottom: 4,
   },
   btnDisabled: {
     opacity: 0.4,
@@ -664,8 +735,8 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   findTimeBlock: {
-    marginTop: 18,
-    marginBottom: 8,
+    marginTop: 0,
+    marginBottom: 16,
   },
   findTimeToggle: {
     flexDirection: 'row',
@@ -701,14 +772,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   secondaryBtn: {
-    backgroundColor: colors.sharedSoft,
+    backgroundColor: colors.white,
     borderRadius: 18,
     paddingVertical: 16,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.ink,
   },
   secondaryBtnText: {
     ...type.bodyMedium,
-    color: colors.sharedDeep,
+    color: colors.ink,
   },
   ghostBtn: {
     marginTop: 10,
@@ -718,6 +791,10 @@ const styles = StyleSheet.create({
   ghostBtnText: {
     ...type.bodyMedium,
     color: colors.muted,
+  },
+  declineBtnText: {
+    ...type.bodyMedium,
+    color: colors.danger,
   },
   previewNote: {
     ...type.body,

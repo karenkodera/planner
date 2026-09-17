@@ -139,6 +139,7 @@ function RequestBlock({
 type Selection =
   | { kind: 'event'; event: CalendarEvent }
   | { kind: 'request'; request: SharedRequest }
+  | { kind: 'travel'; travel: TravelStay }
   | null;
 
 function DayTimelinePage({
@@ -151,6 +152,7 @@ function DayTimelinePage({
   isActive,
   onSelectEvent,
   onSelectRequest,
+  onSelectTravel,
 }: {
   day: Date;
   events: CalendarEvent[];
@@ -161,6 +163,7 @@ function DayTimelinePage({
   isActive: boolean;
   onSelectEvent: (e: CalendarEvent) => void;
   onSelectRequest: (r: SharedRequest) => void;
+  onSelectTravel: (t: TravelStay) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
   const dayEvents = events.filter((e) => eventTouchesDay(e.start, e.end, day));
@@ -184,7 +187,9 @@ function DayTimelinePage({
       ? selection.event.id
       : selection?.kind === 'request'
         ? selection.request.id
-        : null;
+        : selection?.kind === 'travel'
+          ? selection.travel.id
+          : null;
 
   const workHeightMe = (WORK_END_ME - DAY_START) * HOUR_HEIGHT;
   const workHeightPartner = (WORK_END_PARTNER - DAY_START) * HOUR_HEIGHT;
@@ -203,14 +208,21 @@ function DayTimelinePage({
       {dayTravels.length > 0 ? (
         <View style={styles.travelBannerList}>
           {dayTravels.map((travel) => (
-            <View key={travel.id} style={styles.travelBanner}>
+            <Pressable
+              key={travel.id}
+              onPress={() => onSelectTravel(travel)}
+              style={[
+                styles.travelBanner,
+                selectedId === travel.id && styles.travelBannerSelected,
+              ]}
+            >
               <Ionicons name="airplane" size={16} color={colors.inkSoft} />
               <Text style={styles.travelBannerText}>
                 {travel.person === 'me' ? coupleNames.me : coupleNames.partner}
                 {' in '}
                 {travel.place}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : null}
@@ -308,21 +320,52 @@ function EventInfoPanel({
   selection,
   onClose,
   onOpenRequest,
+  onCancelInvite,
 }: {
   selection: Selection;
   onClose: () => void;
   onOpenRequest: (r: SharedRequest) => void;
+  onCancelInvite: (r: SharedRequest) => void;
 }) {
   const { couple } = useCalendar();
   if (!selection) return null;
 
+  if (selection.kind === 'travel') {
+    const { travel } = selection;
+    const who = travel.person === 'me' ? couple.me.name : couple.partner.name;
+    const sameMonth = travel.start.getMonth() === travel.end.getMonth();
+    const dateRange = sameMonth
+      ? `${format(travel.start, 'EEE, MMM d')} – ${format(travel.end, 'EEE, d')}`
+      : `${format(travel.start, 'EEE, MMM d')} – ${format(travel.end, 'EEE, MMM d')}`;
+
+    return (
+      <View style={styles.infoPanel}>
+        <View style={styles.infoHeader}>
+          <Text style={styles.infoEyebrow}>Travel</Text>
+          <Pressable onPress={onClose} hitSlop={10}>
+            <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+        <Text style={styles.infoTitle}>
+          {who} in {travel.place}
+        </Text>
+        <Text style={styles.infoMeta}>{dateRange}</Text>
+        <View style={styles.infoLocationRow}>
+          <Ionicons name="location-outline" size={14} color={colors.ink} />
+          <Text style={styles.infoLocationText}>{travel.place}</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (selection.kind === 'request') {
     const { request } = selection;
+    const outgoing = request.from === 'me';
     return (
       <View style={styles.infoPanel}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoEyebrow}>
-            {request.from === 'me' ? 'Awaiting reply' : 'RSVP'}
+            {outgoing ? 'Awaiting reply' : 'RSVP'}
           </Text>
           <Pressable onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={18} color={colors.muted} />
@@ -332,13 +375,26 @@ function EventInfoPanel({
         <Text style={styles.infoMeta}>
           {formatEventTime(request.proposedStart, request.proposedEnd)}
         </Text>
-        {request.location ? <Text style={styles.infoMeta}>{request.location}</Text> : null}
+        {request.location ? (
+          <View style={styles.infoLocationRow}>
+            <Ionicons name="location-outline" size={14} color={colors.ink} />
+            <Text style={styles.infoLocationText}>{request.location}</Text>
+          </View>
+        ) : null}
         {request.notes ? <Text style={styles.infoNotes}>{request.notes}</Text> : null}
         <Pressable style={styles.infoAction} onPress={() => onOpenRequest(request)}>
           <Text style={styles.infoActionText}>
-            {request.from === 'me' ? 'View invite' : 'RSVP'}
+            {outgoing ? 'View invite' : 'RSVP'}
           </Text>
         </Pressable>
+        {outgoing ? (
+          <Pressable
+            style={styles.infoCancel}
+            onPress={() => onCancelInvite(request)}
+          >
+            <Text style={styles.infoCancelText}>Cancel invite</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }
@@ -361,7 +417,12 @@ function EventInfoPanel({
       </View>
       <Text style={styles.infoTitle}>{event.title}</Text>
       <Text style={styles.infoMeta}>{formatEventTime(event.start, event.end)}</Text>
-      {event.location ? <Text style={styles.infoMeta}>{event.location}</Text> : null}
+      {event.location ? (
+        <View style={styles.infoLocationRow}>
+          <Ionicons name="location-outline" size={14} color={colors.ink} />
+          <Text style={styles.infoLocationText}>{event.location}</Text>
+        </View>
+      ) : null}
       {event.notes ? <Text style={styles.infoNotes}>{event.notes}</Text> : null}
     </View>
   );
@@ -376,7 +437,7 @@ export function DayDetailModal({
   initialDay: Date;
   onClose: () => void;
 }) {
-  const { events, requests, travels, setSelectedDay, openSheet, today, couple } =
+  const { events, requests, travels, setSelectedDay, openSheet, today, couple, declineRequest } =
     useCalendar();
   const pagerRef = useRef<ScrollView>(null);
   const [selection, setSelection] = useState<Selection>(null);
@@ -417,10 +478,8 @@ export function DayDetailModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.shell} edges={['top', 'left', 'right', 'bottom']}>
+        <View style={styles.sheetHandle} />
         <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
-            <Ionicons name="chevron-down" size={24} color={colors.ink} />
-          </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerDow}>
               {format(currentDay, 'EEEE')}
@@ -428,7 +487,6 @@ export function DayDetailModal({
             </Text>
             <Text style={styles.headerDate}>{format(currentDay, 'MMMM d, yyyy')}</Text>
           </View>
-          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -458,6 +516,10 @@ export function DayDetailModal({
                 setSelection({ kind: 'request', request });
                 Haptics.selectionAsync();
               }}
+              onSelectTravel={(travel) => {
+                setSelection({ kind: 'travel', travel });
+                Haptics.selectionAsync();
+              }}
             />
           ))}
         </ScrollView>
@@ -467,6 +529,11 @@ export function DayDetailModal({
           onClose={() => setSelection(null)}
           onOpenRequest={(request) => {
             openSheet({ type: 'requestDetail', request });
+          }}
+          onCancelInvite={(request) => {
+            declineRequest(request.id);
+            setSelection(null);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
         />
       </SafeAreaView>
@@ -480,20 +547,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     paddingTop: 8,
   },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.fillStrong,
+    marginTop: 4,
+    marginBottom: 8,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 20,
-    gap: 8,
-  },
-  closeBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 20,
   },
   headerCenter: {
     flex: 1,
@@ -514,9 +583,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     lineHeight: 26,
   },
-  headerSpacer: {
-    width: 44,
-  },
   pager: {
     flex: 1,
   },
@@ -526,7 +592,7 @@ const styles = StyleSheet.create({
   },
   travelBannerList: {
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 18,
   },
   travelBanner: {
     flexDirection: 'row',
@@ -536,6 +602,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  travelBannerSelected: {
+    backgroundColor: colors.fillStrong,
   },
   travelBannerText: {
     fontFamily: 'Poppins_500Medium',
@@ -685,9 +754,11 @@ const styles = StyleSheet.create({
   infoPanel: {
     marginHorizontal: 16,
     marginBottom: 8,
-    backgroundColor: colors.canvasElevated,
+    backgroundColor: colors.mist,
     borderRadius: 18,
     padding: 16,
+    borderWidth: 1,
+    borderColor: colors.hairline,
   },
   infoHeader: {
     flexDirection: 'row',
@@ -714,6 +785,18 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     marginTop: 4,
   },
+  infoLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+  },
+  infoLocationText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.ink,
+    flexShrink: 1,
+  },
   infoNotes: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 14,
@@ -731,5 +814,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_500Medium',
     fontSize: 14,
     color: colors.white,
+  },
+  infoCancel: {
+    marginTop: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  infoCancelText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.danger,
   },
 });

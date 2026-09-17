@@ -231,12 +231,14 @@ function DayCard({
         haptic="light"
       >
         <View style={styles.dateCol}>
-          <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>
-            {format(day, 'EEE')}
-          </Text>
-          <Text style={[styles.dayDate, isToday && styles.dayDateToday]}>
-            {format(day, 'MMM d')}
-          </Text>
+          {isToday ? (
+            <Text style={[styles.dayDate, styles.dayDateToday]}>Today</Text>
+          ) : (
+            <>
+              <Text style={styles.dayDow}>{format(day, 'EEE')}</Text>
+              <Text style={styles.dayDate}>{format(day, 'MMM d')}</Text>
+            </>
+          )}
         </View>
 
         <View style={styles.dateDivider} />
