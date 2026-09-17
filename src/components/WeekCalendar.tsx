@@ -21,7 +21,7 @@ import {
   isSameDay as dfIsSameDay,
   startOfWeek,
 } from 'date-fns';
-import { CalendarEvent, SharedRequest } from '../types/calendar';
+import { CalendarEvent, SharedRequest, TravelStay } from '../types/calendar';
 import { colors } from '../theme/colors';
 import { type } from '../theme/typography';
 import { useCalendar } from '../store/CalendarContext';
@@ -35,6 +35,7 @@ import {
   isSameDay,
   isSameMonth,
   overlaps,
+  travelTouchesDay,
   WEEK_STARTS_ON,
 } from '../utils/date';
 
@@ -178,6 +179,7 @@ function DayCard({
   index,
   meInitial,
   partnerInitial,
+  travels,
   onPress,
   onRequestPress,
 }: {
@@ -188,6 +190,7 @@ function DayCard({
   index: number;
   meInitial: string;
   partnerInitial: string;
+  travels: TravelStay[];
   onPress: () => void;
   onRequestPress: (request: SharedRequest) => void;
 }) {
@@ -203,6 +206,9 @@ function DayCard({
   }, [appear, index]);
 
   const isEmpty = items.length === 0;
+  const dayTravels = travels.filter((t) =>
+    travelTouchesDay(t.start, t.end, day),
+  );
 
   return (
     <Animated.View
@@ -236,7 +242,9 @@ function DayCard({
         <View style={styles.dateDivider} />
 
         <View style={styles.plansCol}>
-          {isEmpty ? <Text style={styles.emptyPlans}>Free evening</Text> : null}
+          {isEmpty && dayTravels.length === 0 ? (
+            <Text style={styles.emptyPlans}>Free evening</Text>
+          ) : null}
 
           {items.map((item) => {
             if (item.kind === 'event') {
@@ -297,6 +305,16 @@ function DayCard({
               </Pressable>
             );
           })}
+
+          {dayTravels.map((travel) => (
+            <View key={travel.id} style={styles.travelRow}>
+              <OwnerBadge
+                letter={travel.person === 'me' ? meInitial : partnerInitial}
+                tone={travel.person === 'me' ? 'me' : 'partner'}
+              />
+              <Text style={styles.travelText}>in {travel.place}</Text>
+            </View>
+          ))}
         </View>
       </PressableScale>
     </Animated.View>
@@ -310,6 +328,7 @@ export function WeekDayCards() {
     setSelectedDay,
     events,
     requests,
+    travels,
     today,
     openSheet,
     couple,
@@ -421,6 +440,7 @@ export function WeekDayCards() {
                     index={pageIdx === anchorIndex ? index : 0}
                     meInitial={couple.me.initial}
                     partnerInitial={couple.partner.initial}
+                    travels={travels}
                     onPress={() => openDayDetail(day)}
                     onRequestPress={(request) =>
                       openSheet({ type: 'requestDetail', request })
@@ -842,6 +862,17 @@ const styles = StyleSheet.create({
   },
   requestPillOutgoing: {
     color: colors.muted,
+  },
+  travelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  travelText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: colors.inkSoft,
   },
   monthOverlay: {
     flex: 1,

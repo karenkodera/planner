@@ -5,8 +5,8 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { CalendarEvent, FreeSlot, SharedRequest } from '../types/calendar';
-import { couple, mockEvents, mockRequests, TODAY } from '../data/mock';
+import { CalendarEvent, FreeSlot, SharedRequest, TravelStay } from '../types/calendar';
+import { couple, mockEvents, mockRequests, mockTravels, TODAY } from '../data/mock';
 import { findMutualFreeSlots, suggestAlternateTime } from '../utils/findTime';
 import { addDays, differenceInMinutes } from 'date-fns';
 import { parseNaturalEvent } from '../utils/voiceParse';
@@ -27,6 +27,7 @@ type CalendarContextValue = {
   weekAnchor: Date;
   events: CalendarEvent[];
   requests: SharedRequest[];
+  travels: TravelStay[];
   pendingCount: number;
   freeSlots: FreeSlot[];
   sheet: Sheet;
@@ -62,6 +63,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [selectedDay, setSelectedDay] = useState(TODAY);
   const [events, setEvents] = useState<CalendarEvent[]>(mockEvents);
   const [requests, setRequests] = useState<SharedRequest[]>(mockRequests);
+  const [travels] = useState<TravelStay[]>(mockTravels);
   const [sheet, setSheet] = useState<Sheet>({ type: 'none' });
 
   const pendingCount = useMemo(
@@ -236,6 +238,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     weekAnchor,
     events,
     requests,
+    travels,
     pendingCount,
     freeSlots,
     sheet,

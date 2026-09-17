@@ -14,10 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { addDays, format as formatDate, getDay } from 'date-fns';
-import { CalendarEvent, SharedRequest } from '../types/calendar';
+import { CalendarEvent, SharedRequest, TravelStay } from '../types/calendar';
 import { colors } from '../theme/colors';
 import { useCalendar } from '../store/CalendarContext';
-import { eventTouchesDay, format, formatEventTime, isSameDay, overlaps } from '../utils/date';
+import {
+  eventTouchesDay,
+  format,
+  formatEventTime,
+  isSameDay,
+  overlaps,
+  travelTouchesDay,
+} from '../utils/date';
 
 const HOUR_HEIGHT = 64;
 const DAY_START = 8;
@@ -138,6 +145,7 @@ function DayTimelinePage({
   day,
   events,
   requests,
+  travels,
   coupleNames,
   selection,
   isActive,
@@ -147,6 +155,7 @@ function DayTimelinePage({
   day: Date;
   events: CalendarEvent[];
   requests: SharedRequest[];
+  travels: TravelStay[];
   coupleNames: { me: string; partner: string };
   selection: Selection;
   isActive: boolean;
@@ -166,6 +175,9 @@ function DayTimelinePage({
       overlaps(e.start, e.end, r.proposedStart, r.proposedEnd),
     );
   });
+  const dayTravels = travels.filter((t) =>
+    travelTouchesDay(t.start, t.end, day),
+  );
 
   const selectedId =
     selection?.kind === 'event'
@@ -188,6 +200,21 @@ function DayTimelinePage({
 
   return (
     <View style={[styles.page, { width: SCREEN_W }]}>
+      {dayTravels.length > 0 ? (
+        <View style={styles.travelBannerList}>
+          {dayTravels.map((travel) => (
+            <View key={travel.id} style={styles.travelBanner}>
+              <Ionicons name="airplane" size={16} color={colors.inkSoft} />
+              <Text style={styles.travelBannerText}>
+                {travel.person === 'me' ? coupleNames.me : coupleNames.partner}
+                {' in '}
+                {travel.place}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.laneLabels}>
         <Text style={styles.laneLabel}>{coupleNames.me}</Text>
         <Text style={styles.laneLabel}>{coupleNames.partner}</Text>
@@ -349,7 +376,8 @@ export function DayDetailModal({
   initialDay: Date;
   onClose: () => void;
 }) {
-  const { events, requests, setSelectedDay, openSheet, today, couple } = useCalendar();
+  const { events, requests, travels, setSelectedDay, openSheet, today, couple } =
+    useCalendar();
   const pagerRef = useRef<ScrollView>(null);
   const [selection, setSelection] = useState<Selection>(null);
 
@@ -418,6 +446,7 @@ export function DayDetailModal({
               day={day}
               events={events}
               requests={requests}
+              travels={travels}
               coupleNames={{ me: couple.me.name, partner: couple.partner.name }}
               selection={selection}
               isActive={idx === pageIndex}
@@ -494,6 +523,24 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  travelBannerList: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  travelBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.fill,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  travelBannerText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    color: colors.inkSoft,
   },
   laneLabels: {
     flexDirection: 'row',

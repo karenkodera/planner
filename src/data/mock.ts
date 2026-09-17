@@ -1,4 +1,4 @@
-import { CalendarEvent, CoupleProfile, SharedRequest } from '../types/calendar';
+import { CalendarEvent, CoupleProfile, SharedRequest, TravelStay } from '../types/calendar';
 import { addDays, atTime } from '../utils/date';
 
 /** Anchor week around Tue Sep 15, 2026 */
@@ -119,5 +119,16 @@ export const mockRequests: SharedRequest[] = [
     from: 'me',
     status: 'pending',
     createdAt: atTime(tue, 12, 0),
+  },
+];
+
+/** Thomas in Miami Mon–Wed this week */
+export const mockTravels: TravelStay[] = [
+  {
+    id: 't1',
+    person: 'partner',
+    place: 'Miami',
+    start: mon,
+    end: wed,
   },
 ];

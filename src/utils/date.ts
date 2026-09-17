@@ -76,6 +76,17 @@ export function eventTouchesDay(start: Date, end: Date, day: Date): boolean {
     || isSameDay(start, day);
 }
 
+export function travelTouchesDay(
+  travelStart: Date,
+  travelEnd: Date,
+  day: Date,
+): boolean {
+  const dayStart = startOfDay(day).getTime();
+  const rangeStart = startOfDay(travelStart).getTime();
+  const rangeEnd = endOfDay(travelEnd).getTime();
+  return dayStart >= rangeStart && dayStart <= rangeEnd;
+}
+
 export function atTime(day: Date, hour: number, minute = 0): Date {
   return setMinutes(setHours(day, hour), minute);
 }

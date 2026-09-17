@@ -42,3 +42,12 @@ export type CoupleProfile = {
   me: { id: PersonId; name: string; shortName: string; initial: string };
   partner: { id: PersonId; name: string; shortName: string; initial: string };
 };
+
+/** Multi-day travel / away status for a person */
+export type TravelStay = {
+  id: string;
+  person: PersonId;
+  place: string;
+  start: Date;
+  end: Date;
+};
