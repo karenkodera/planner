@@ -7,8 +7,9 @@ import React, {
 } from 'react';
 import { CalendarEvent, FreeSlot, SharedRequest, TravelStay } from '../types/calendar';
 import { couple, mockEvents, mockRequests, mockTravels, TODAY } from '../data/mock';
-import { findMutualFreeSlots, suggestAlternateTime } from '../utils/findTime';
-import { addDays, differenceInMinutes } from 'date-fns';
+import { findMutualFreeSlots } from '../utils/findTime';
+import { colors } from '../theme/colors';
+import { addDays } from 'date-fns';
 import { parseNaturalEvent } from '../utils/voiceParse';
 
 type Sheet =
@@ -32,6 +33,8 @@ type CalendarContextValue = {
   freeSlots: FreeSlot[];
   sheet: Sheet;
   selectedDay: Date;
+  meColor: string;
+  setMeColor: (color: string) => void;
   setSelectedDay: (d: Date) => void;
   goWeek: (delta: number) => void;
   jumpToDay: (d: Date) => void;
@@ -47,7 +50,7 @@ type CalendarContextValue = {
     end: Date;
   }) => void;
   acceptRequest: (id: string) => void;
-  suggestRequestTime: (id: string) => void;
+  suggestRequestTime: (id: string, start: Date, end: Date) => void;
   declineRequest: (id: string) => void;
   createFromSlot: (slot: FreeSlot, title: string) => void;
 };
@@ -65,6 +68,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [requests, setRequests] = useState<SharedRequest[]>(mockRequests);
   const [travels] = useState<TravelStay[]>(mockTravels);
   const [sheet, setSheet] = useState<Sheet>({ type: 'none' });
+  const [meColor, setMeColor] = useState<string>(colors.me);
 
   const pendingCount = useMemo(
     () => requests.filter((r) => r.status === 'pending' && r.from === 'partner').length,
@@ -181,26 +185,21 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const suggestRequestTime = useCallback(
-    (id: string) => {
-      setRequests((prev) => {
-        const target = prev.find((r) => r.id === id);
-        if (!target) return prev;
-        const duration = differenceInMinutes(target.proposedEnd, target.proposedStart);
-        const alt = suggestAlternateTime(events, target.proposedStart, duration);
-        if (!alt) return prev;
-        return prev.map((r) =>
+    (id: string, start: Date, end: Date) => {
+      setRequests((prev) =>
+        prev.map((r) =>
           (r.id === id
             ? {
                 ...r,
                 status: 'suggested' as const,
-                suggestedStart: alt.start,
-                suggestedEnd: alt.end,
+                suggestedStart: start,
+                suggestedEnd: end,
               }
             : r),
-        );
-      });
+        ),
+      );
     },
-    [events],
+    [],
   );
 
   const declineRequest = useCallback((id: string) => {
@@ -243,6 +242,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     freeSlots,
     sheet,
     selectedDay,
+    meColor,
+    setMeColor,
     setSelectedDay,
     goWeek,
     jumpToDay,

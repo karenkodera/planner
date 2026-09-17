@@ -18,7 +18,7 @@ import { type } from '../theme/typography';
 import { useCalendar } from '../store/CalendarContext';
 import { CalendarEvent } from '../types/calendar';
 import { format, formatEventTime } from '../utils/date';
-import { slotDurationLabel } from '../utils/findTime';
+import { findMutualFreeSlots, slotDurationLabel } from '../utils/findTime';
 import { VOICE_DEMO_PHRASES } from '../utils/voiceParse';
 import { PressableScale } from './PressableScale';
 
@@ -398,8 +398,14 @@ function RequestsSheet() {
     declineRequest,
     openSheet,
     couple,
+    events,
   } = useCalendar();
   const visible = sheet.type === 'requests' || sheet.type === 'requestDetail';
+  const [step, setStep] = useState<'detail' | 'suggestTime'>('detail');
+
+  useEffect(() => {
+    if (visible) setStep('detail');
+  }, [visible, sheet]);
 
   if (!visible) return null;
 
@@ -412,6 +418,65 @@ function RequestsSheet() {
     const speakerInitial = fromPartner
       ? couple.partner.initial
       : couple.me.initial;
+    const durationMins = Math.max(
+      30,
+      Math.round((detail.proposedEnd.getTime() - detail.proposedStart.getTime()) / 60000),
+    );
+    const suggestOptions = findMutualFreeSlots(events, detail.proposedStart, 12)
+      .filter(
+        (slot) =>
+          slot.durationMinutes >= durationMins
+          && slot.start.getTime() !== detail.proposedStart.getTime(),
+      )
+      .map((slot) => ({
+        id: slot.id,
+        start: slot.start,
+        end: new Date(slot.start.getTime() + durationMins * 60000),
+        dayLabel: slot.dayLabel,
+        timeLabel: `${format(slot.start, 'h:mm a')} – ${format(
+          new Date(slot.start.getTime() + durationMins * 60000),
+          'h:mm a',
+        )}`,
+      }));
+
+    if (step === 'suggestTime') {
+      return (
+        <SheetShell
+          visible
+          onClose={closeSheet}
+          title="Suggest a time"
+          subtitle={`Pick a time for “${detail.title}”`}
+        >
+          <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+            {suggestOptions.map((option) => (
+              <PressableScale
+                key={option.id}
+                style={styles.slotCard}
+                onPress={() => {
+                  suggestRequestTime(detail.id, option.start, option.end);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  closeSheet();
+                }}
+                haptic="light"
+              >
+                <View>
+                  <Text style={styles.slotDay}>{option.dayLabel}</Text>
+                  <Text style={styles.slotTime}>{option.timeLabel}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+              </PressableScale>
+            ))}
+            {!suggestOptions.length ? (
+              <Text style={styles.empty}>No open times this week — try next week.</Text>
+            ) : null}
+          </ScrollView>
+          <Pressable style={styles.ghostBtn} onPress={() => setStep('detail')}>
+            <Text style={styles.ghostBtnText}>Back</Text>
+          </Pressable>
+        </SheetShell>
+      );
+    }
+
     return (
       <SheetShell
         visible
@@ -445,7 +510,7 @@ function RequestsSheet() {
             <Pressable
               style={[styles.secondaryBtn, { flex: 1 }]}
               onPress={() => {
-                suggestRequestTime(detail.id);
+                setStep('suggestTime');
                 Haptics.selectionAsync();
               }}
             >
@@ -506,26 +571,40 @@ function RequestsSheet() {
     <SheetShell
       visible
       onClose={closeSheet}
-      title="Shared requests"
-      subtitle="Plans waiting for a yes"
+      title="Requests"
+      subtitle="Plans waiting for your reply"
     >
       <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-        {requests.map((r) => (
-          <PressableScale
-            key={r.id}
-            style={styles.requestCard}
-            onPress={() => openSheet({ type: 'requestDetail', request: r })}
-            haptic="selection"
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.slotDay}>{r.title}</Text>
-              <Text style={styles.slotTime}>
-                {format(r.proposedStart, 'EEE · h:mm a')} · {r.status}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </PressableScale>
-        ))}
+        {requests
+          .filter(
+            (r) =>
+              r.from === 'partner'
+              && (r.status === 'pending' || r.status === 'suggested'),
+          )
+          .map((r) => (
+            <PressableScale
+              key={r.id}
+              style={styles.requestCard}
+              onPress={() => openSheet({ type: 'requestDetail', request: r })}
+              haptic="selection"
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.slotDay}>{r.title}</Text>
+                <Text style={styles.slotTime}>
+                  {format(r.proposedStart, 'EEE · h:mm a')}
+                  {` · From ${couple.partner.shortName}`}
+                </Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </PressableScale>
+          ))}
+        {!requests.some(
+          (r) =>
+            r.from === 'partner'
+            && (r.status === 'pending' || r.status === 'suggested'),
+        ) ? (
+          <Text style={styles.empty}>Nothing needs a reply</Text>
+        ) : null}
       </ScrollView>
     </SheetShell>
   );

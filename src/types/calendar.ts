@@ -39,8 +39,8 @@ export type FreeSlot = {
 };
 
 export type CoupleProfile = {
-  me: { id: PersonId; name: string; shortName: string; initial: string };
-  partner: { id: PersonId; name: string; shortName: string; initial: string };
+  me: { id: PersonId; name: string; shortName: string; initial: string; email: string };
+  partner: { id: PersonId; name: string; shortName: string; initial: string; email: string };
 };
 
 /** Multi-day travel / away status for a person */

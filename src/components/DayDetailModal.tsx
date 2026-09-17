@@ -505,7 +505,7 @@ export function DayDetailModal({
               events={events}
               requests={requests}
               travels={travels}
-              coupleNames={{ me: couple.me.name, partner: couple.partner.name }}
+              coupleNames={{ me: couple.me.shortName, partner: couple.partner.shortName }}
               selection={selection}
               isActive={idx === pageIndex}
               onSelectEvent={(event) => {

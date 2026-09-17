@@ -9,11 +9,11 @@ export function AtmosphereBackground({ children }: { children: React.ReactNode }
 }
 
 export function BrandMark() {
-  const { couple } = useCalendar();
+  const { couple, meColor } = useCalendar();
   return (
     <View style={styles.brandRow}>
       <View style={styles.avatarPair}>
-        <View style={[styles.avatar, styles.avatarMe]}>
+        <View style={[styles.avatar, styles.avatarMe, { backgroundColor: meColor }]}>
           <Text style={styles.avatarText}>{couple.me.initial}</Text>
         </View>
         <View style={[styles.avatar, styles.avatarPartner]}>

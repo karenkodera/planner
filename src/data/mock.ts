@@ -21,8 +21,20 @@ const nextSat = addDays(nextMon, 5);
 const nextSun = addDays(nextMon, 6);
 
 export const couple: CoupleProfile = {
-  me: { id: 'me', name: 'Karen', shortName: 'You', initial: 'K' },
-  partner: { id: 'partner', name: 'Thomas', shortName: 'Thomas', initial: 'T' },
+  me: {
+    id: 'me',
+    name: 'Karen',
+    shortName: 'You',
+    initial: 'K',
+    email: 'karen@kodera.us',
+  },
+  partner: {
+    id: 'partner',
+    name: 'Thomas Tran',
+    shortName: 'Thomas',
+    initial: 'T',
+    email: 'thomas@kodera.us',
+  },
 };
 
 /**

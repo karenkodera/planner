@@ -50,11 +50,13 @@ function OwnerBadge({
   letter: string;
   tone: 'me' | 'partner' | 'shared';
 }) {
+  const { meColor } = useCalendar();
   return (
     <View
       style={[
         styles.ownerBadge,
         tone === 'me' && styles.ownerBadgeMe,
+        tone === 'me' && { backgroundColor: meColor },
         tone === 'partner' && styles.ownerBadgePartner,
         tone === 'shared' && styles.ownerBadgeShared,
       ]}
@@ -73,11 +75,13 @@ function MiniInitial({
   tone: 'me' | 'partner' | 'shared';
   selected?: boolean;
 }) {
+  const { meColor } = useCalendar();
   return (
     <View
       style={[
         styles.miniInitial,
         tone === 'me' && styles.miniInitialMe,
+        tone === 'me' && { backgroundColor: meColor },
         tone === 'partner' && styles.miniInitialPartner,
         tone === 'shared' && styles.miniInitialShared,
         selected && tone !== 'shared' && styles.miniInitialOnDark,
