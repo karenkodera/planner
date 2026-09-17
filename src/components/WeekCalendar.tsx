@@ -469,7 +469,7 @@ export function MonthViewModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const { weekAnchor, selectedDay, events, today, jumpToDay, couple } =
+  const { weekAnchor, events, today, jumpToDay, couple } =
     useCalendar();
   const [monthAnchor, setMonthAnchor] = useState(weekAnchor);
   const slide = useRef(new Animated.Value(0)).current;
@@ -593,7 +593,6 @@ export function MonthViewModal({
                   <View style={styles.monthGrid}>
                     {grid.map((day) => {
                       const inMonth = isSameMonth(day, month);
-                      const selected = isSameDay(day, selectedDay);
                       const isToday = isSameDay(day, today);
                       const dayEvents = events.filter((e) =>
                         eventTouchesDay(e.start, e.end, day),
@@ -608,15 +607,14 @@ export function MonthViewModal({
                             onPress={() => selectDay(day)}
                             style={[
                               styles.monthCell,
-                              selected && styles.monthCellSelected,
-                              isToday && !selected && styles.monthCellToday,
+                              isToday && styles.monthCellToday,
                               !inMonth && styles.monthCellMuted,
                             ]}
                           >
                             <Text
                               style={[
                                 styles.monthDayNum,
-                                selected && styles.monthDayNumSelected,
+                                isToday && styles.monthDayNumToday,
                                 !inMonth && styles.monthDayNumMuted,
                               ]}
                             >
@@ -627,7 +625,6 @@ export function MonthViewModal({
                                 <LinkedMonthMarks
                                   meInitial={couple.me.initial}
                                   partnerInitial={couple.partner.initial}
-                                  selected={selected}
                                 />
                               ) : (
                                 <>
@@ -635,14 +632,12 @@ export function MonthViewModal({
                                     <MiniInitial
                                       letter={couple.me.initial}
                                       tone="me"
-                                      selected={selected}
                                     />
                                   ) : null}
                                   {hasPartner ? (
                                     <MiniInitial
                                       letter={couple.partner.initial}
                                       tone="partner"
-                                      selected={selected}
                                     />
                                   ) : null}
                                 </>
@@ -949,7 +944,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   monthCellToday: {
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.ink,
   },
   monthCellMuted: {
     opacity: 0.35,
@@ -960,6 +955,9 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   monthDayNumSelected: {
+    color: colors.white,
+  },
+  monthDayNumToday: {
     color: colors.white,
   },
   monthDayNumMuted: {

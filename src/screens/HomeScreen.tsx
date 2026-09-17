@@ -48,10 +48,20 @@ export function HomeScreen() {
   const [requestsOpen, setRequestsOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [drawerContentH, setDrawerContentH] = useState(120);
   const weekPulse = useRef(new Animated.Value(1)).current;
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const searchSlide = useRef(new Animated.Value(0)).current;
+
+  const activeRequests = useMemo(
+    () =>
+      requests.filter((r) => r.status === 'pending' || r.status === 'suggested'),
+    [requests],
+  );
+
+  const drawerOpenHeight = useMemo(() => {
+    if (!activeRequests.length) return 56;
+    return 14 + activeRequests.length * 70;
+  }, [activeRequests.length]);
 
   useEffect(() => {
     Animated.timing(drawerAnim, {
@@ -62,7 +72,7 @@ export function HomeScreen() {
         : Easing.in(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [requestsOpen, drawerAnim]);
+  }, [requestsOpen, drawerAnim, drawerOpenHeight]);
 
   const openSearch = () => {
     if (requestsOpen) setRequestsOpen(false);
@@ -138,15 +148,9 @@ export function HomeScreen() {
     );
   }, [requests, q]);
 
-  const activeRequests = useMemo(
-    () =>
-      requests.filter((r) => r.status === 'pending' || r.status === 'suggested'),
-    [requests],
-  );
-
   const drawerHeight = drawerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, Math.max(drawerContentH, 1)],
+    outputRange: [0, drawerOpenHeight],
   });
 
   return (
@@ -254,15 +258,7 @@ export function HomeScreen() {
                 ]}
                 pointerEvents={requestsOpen ? 'auto' : 'none'}
               >
-                <View
-                  style={styles.requestsDrawerInner}
-                  onLayout={(e) => {
-                    const h = e.nativeEvent.layout.height;
-                    if (h > 0 && Math.abs(h - drawerContentH) > 1) {
-                      setDrawerContentH(h);
-                    }
-                  }}
-                >
+                <View style={styles.requestsDrawerInner}>
                   {activeRequests.map((request) => (
                     <PressableScale
                       key={request.id}
