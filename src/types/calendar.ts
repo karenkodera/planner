@@ -4,6 +4,8 @@ export type EventOwner = 'me' | 'partner' | 'shared';
 
 export type RequestStatus = 'pending' | 'accepted' | 'suggested' | 'declined';
 
+export type Recurrence = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
 export type CalendarEvent = {
   id: string;
   title: string;
@@ -13,6 +15,7 @@ export type CalendarEvent = {
   end: Date;
   owner: EventOwner;
   colorHint?: string;
+  recurrence?: Recurrence;
 };
 
 export type SharedRequest = {

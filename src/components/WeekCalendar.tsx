@@ -28,7 +28,6 @@ import { useCalendar } from '../store/CalendarContext';
 import { DayDetailModal } from './DayDetailModal';
 import { PressableScale } from './PressableScale';
 import {
-  eventTouchesDay,
   format,
   getMonthGrid,
   getWeekDays,
@@ -38,6 +37,7 @@ import {
   travelTouchesDay,
   WEEK_STARTS_ON,
 } from '../utils/date';
+import { colorWithAlpha, occurrenceOnDay } from '../utils/recurrence';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const WEEK_PAGE_COUNT = 41;
@@ -199,6 +199,7 @@ function DayCard({
   onRequestPress: (request: SharedRequest) => void;
 }) {
   const appear = useRef(new Animated.Value(0)).current;
+  const { meColor } = useCalendar();
 
   useEffect(() => {
     Animated.timing(appear, {
@@ -256,10 +257,16 @@ function DayCard({
             if (item.kind === 'event') {
               const { event } = item;
               const isShared = event.owner === 'shared';
+              const isMine = event.owner === 'me';
               return (
                 <View
                   key={event.id}
-                  style={[styles.eventRow, isShared && styles.togetherBlob]}
+                  style={[
+                    styles.eventRow,
+                    isShared && styles.togetherBlob,
+                    isMine && styles.mineBlob,
+                    isMine && { backgroundColor: colorWithAlpha(meColor, 0.1) },
+                  ]}
                 >
                   <EventLines
                     time={format(event.start, 'h:mm a')}
@@ -373,14 +380,13 @@ export function WeekDayCards() {
 
   const itemsForDay = (day: Date): DayItem[] => {
     const dayEvents = events
-      .filter((e) => eventTouchesDay(e.start, e.end, day))
+      .map((e) => occurrenceOnDay(e, day))
+      .filter((e): e is CalendarEvent => e != null)
       .map((event) => ({ kind: 'event' as const, event }));
 
-    const myBusy = events.filter(
-      (e) =>
-        (e.owner === 'me' || e.owner === 'shared')
-        && eventTouchesDay(e.start, e.end, day),
-    );
+    const myBusy = dayEvents
+      .map((item) => item.event)
+      .filter((e) => e.owner === 'me' || e.owner === 'shared');
 
     const dayRequests = requests
       .filter((r) => {
@@ -481,6 +487,7 @@ export function MonthViewModal({
   const slide = useRef(new Animated.Value(0)).current;
   const pagerRef = useRef<ScrollView>(null);
   const syncing = useRef(false);
+  const lastTitleTap = useRef(0);
   const PAGE_W = SCREEN_W;
 
   useEffect(() => {
@@ -510,6 +517,21 @@ export function MonthViewModal({
     jumpToDay(day);
     Haptics.selectionAsync();
     onClose();
+  };
+
+  const onMonthTitlePress = () => {
+    const now = Date.now();
+    if (now - lastTitleTap.current < 320) {
+      setMonthAnchor(today);
+      jumpToDay(today);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      requestAnimationFrame(() => {
+        pagerRef.current?.scrollTo({ x: PAGE_W, animated: false });
+      });
+      lastTitleTap.current = 0;
+      return;
+    }
+    lastTitleTap.current = now;
   };
 
   const goMonth = (delta: number) => {
@@ -562,7 +584,9 @@ export function MonthViewModal({
             >
               <Ionicons name="chevron-back" size={20} color={colors.ink} />
             </PressableScale>
-            <Text style={styles.monthTitle}>{formatDate(monthAnchor, 'MMMM yyyy')}</Text>
+            <Pressable onPress={onMonthTitlePress} hitSlop={8}>
+              <Text style={styles.monthTitle}>{formatDate(monthAnchor, 'MMMM yyyy')}</Text>
+            </Pressable>
             <PressableScale
               hitSlop={12}
               onPress={() => goMonth(1)}
@@ -600,9 +624,9 @@ export function MonthViewModal({
                     {grid.map((day) => {
                       const inMonth = isSameMonth(day, month);
                       const isToday = isSameDay(day, today);
-                      const dayEvents = events.filter((e) =>
-                        eventTouchesDay(e.start, e.end, day),
-                      );
+                      const dayEvents = events
+                        .map((e) => occurrenceOnDay(e, day))
+                        .filter((e): e is CalendarEvent => e != null);
                       const hasShared = dayEvents.some((e) => e.owner === 'shared');
                       const hasMine = dayEvents.some((e) => e.owner === 'me');
                       const hasPartner = dayEvents.some((e) => e.owner === 'partner');
@@ -658,10 +682,6 @@ export function MonthViewModal({
               );
             })}
           </ScrollView>
-
-          <PressableScale style={styles.monthClose} onPress={onClose} haptic="light">
-            <Text style={styles.monthCloseText}>Done</Text>
-          </PressableScale>
         </Animated.View>
       </View>
     </Modal>
@@ -823,6 +843,11 @@ const styles = StyleSheet.create({
   },
   togetherBlob: {
     backgroundColor: colors.sharedSoft,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  mineBlob: {
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,

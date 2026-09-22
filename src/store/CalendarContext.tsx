@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { CalendarEvent, FreeSlot, SharedRequest, TravelStay } from '../types/calendar';
+import { CalendarEvent, FreeSlot, Recurrence, SharedRequest, TravelStay } from '../types/calendar';
 import { couple, mockEvents, mockRequests, mockTravels, TODAY } from '../data/mock';
 import { findMutualFreeSlots } from '../utils/findTime';
 import { colors } from '../theme/colors';
@@ -15,6 +15,7 @@ import { parseNaturalEvent } from '../utils/voiceParse';
 type Sheet =
   | { type: 'none' }
   | { type: 'event'; event: CalendarEvent }
+  | { type: 'edit'; event: CalendarEvent }
   | { type: 'create' }
   | { type: 'voice' }
   | { type: 'findTime' }
@@ -35,13 +36,16 @@ type CalendarContextValue = {
   selectedDay: Date;
   meColor: string;
   setMeColor: (color: string) => void;
+  partnerLinked: boolean;
   setSelectedDay: (d: Date) => void;
   goWeek: (delta: number) => void;
   jumpToDay: (d: Date) => void;
   openSheet: (sheet: Sheet) => void;
   closeSheet: () => void;
   addEvent: (event: Omit<CalendarEvent, 'id'>) => void;
-  addFromVoice: (utterance: string) => CalendarEvent;
+  updateEvent: (id: string, patch: Partial<Omit<CalendarEvent, 'id'>>) => void;
+  deleteEvent: (id: string) => void;
+  addFromVoice: (utterance: string, recurrence?: Recurrence) => CalendarEvent;
   sendSharedRequest: (input: {
     title: string;
     notes?: string;
@@ -52,7 +56,8 @@ type CalendarContextValue = {
   acceptRequest: (id: string) => void;
   suggestRequestTime: (id: string, start: Date, end: Date) => void;
   declineRequest: (id: string) => void;
-  createFromSlot: (slot: FreeSlot, title: string) => void;
+  createFromSlot: (slot: FreeSlot, title: string, recurrence?: Recurrence) => void;
+  removePartner: () => void;
 };
 
 const CalendarContext = createContext<CalendarContextValue | null>(null);
@@ -66,9 +71,10 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [selectedDay, setSelectedDay] = useState(TODAY);
   const [events, setEvents] = useState<CalendarEvent[]>(mockEvents);
   const [requests, setRequests] = useState<SharedRequest[]>(mockRequests);
-  const [travels] = useState<TravelStay[]>(mockTravels);
+  const [travels, setTravels] = useState<TravelStay[]>(mockTravels);
   const [sheet, setSheet] = useState<Sheet>({ type: 'none' });
   const [meColor, setMeColor] = useState<string>(colors.me);
+  const [partnerLinked, setPartnerLinked] = useState(true);
 
   const pendingCount = useMemo(
     () => requests.filter((r) => r.status === 'pending' && r.from === 'partner').length,
@@ -96,12 +102,22 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const addEvent = useCallback((event: Omit<CalendarEvent, 'id'>) => {
     const full: CalendarEvent = { ...event, id: uid('e') };
     setEvents((prev) => [...prev, full]);
-    if (event.owner === 'shared') {
-      // Shared creations from "me" also land as accepted together time
-    }
   }, []);
 
-  const addFromVoice = useCallback((utterance: string) => {
+  const updateEvent = useCallback(
+    (id: string, patch: Partial<Omit<CalendarEvent, 'id'>>) => {
+      setEvents((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+      );
+    },
+    [],
+  );
+
+  const deleteEvent = useCallback((id: string) => {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  }, []);
+
+  const addFromVoice = useCallback((utterance: string, recurrence: Recurrence = 'none') => {
     const parsed = parseNaturalEvent(utterance, TODAY);
     if (parsed.owner === 'shared') {
       const request: SharedRequest = {
@@ -121,6 +137,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         end: parsed.end,
         owner: 'me',
         notes: 'Waiting on Thomas',
+        recurrence,
       };
       setEvents((prev) => [...prev, event]);
       return event;
@@ -131,6 +148,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       start: parsed.start,
       end: parsed.end,
       owner: parsed.owner,
+      recurrence,
     };
     setEvents((prev) => [...prev, event]);
     return event;
@@ -208,27 +226,38 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const createFromSlot = useCallback((slot: FreeSlot, title: string) => {
-    const event: CalendarEvent = {
-      id: uid('e'),
-      title,
-      start: slot.start,
-      end: slot.end,
-      owner: 'shared',
-    };
-    setEvents((prev) => [...prev, event]);
-    setRequests((prev) => [
-      {
-        id: uid('r'),
+  const createFromSlot = useCallback(
+    (slot: FreeSlot, title: string, recurrence: Recurrence = 'none') => {
+      const event: CalendarEvent = {
+        id: uid('e'),
         title,
-        proposedStart: slot.start,
-        proposedEnd: slot.end,
-        from: 'me',
-        status: 'accepted',
-        createdAt: new Date(),
-      },
-      ...prev,
-    ]);
+        start: slot.start,
+        end: slot.end,
+        owner: 'shared',
+        recurrence,
+      };
+      setEvents((prev) => [...prev, event]);
+      setRequests((prev) => [
+        {
+          id: uid('r'),
+          title,
+          proposedStart: slot.start,
+          proposedEnd: slot.end,
+          from: 'me',
+          status: 'accepted',
+          createdAt: new Date(),
+        },
+        ...prev,
+      ]);
+    },
+    [],
+  );
+
+  const removePartner = useCallback(() => {
+    setPartnerLinked(false);
+    setEvents((prev) => prev.filter((e) => e.owner !== 'partner'));
+    setTravels((prev) => prev.filter((t) => t.person !== 'partner'));
+    setRequests((prev) => prev.filter((r) => r.from !== 'partner'));
   }, []);
 
   const value: CalendarContextValue = {
@@ -244,18 +273,22 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     selectedDay,
     meColor,
     setMeColor,
+    partnerLinked,
     setSelectedDay,
     goWeek,
     jumpToDay,
     openSheet: setSheet,
     closeSheet: () => setSheet({ type: 'none' }),
     addEvent,
+    updateEvent,
+    deleteEvent,
     addFromVoice,
     sendSharedRequest,
     acceptRequest,
     suggestRequestTime,
     declineRequest,
     createFromSlot,
+    removePartner,
   };
 
   return (

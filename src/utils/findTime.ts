@@ -4,12 +4,12 @@ import {
   addMinutes,
   atTime,
   differenceInMinutes,
-  eventTouchesDay,
   format,
   getWeekDays,
   overlaps,
   slotDurationLabel,
 } from '../utils/date';
+import { occurrenceOnDay } from '../utils/recurrence';
 
 const WEEKDAY_START = 17; // 5pm — after work
 const WEEKEND_START = 10;
@@ -30,7 +30,8 @@ function busyForPerson(
   owners: Array<CalendarEvent['owner']>,
 ): BusyInterval[] {
   return events
-    .filter((e) => owners.includes(e.owner) && eventTouchesDay(e.start, e.end, day))
+    .map((e) => occurrenceOnDay(e, day))
+    .filter((e): e is CalendarEvent => e != null && owners.includes(e.owner))
     .map((e) => ({ start: e.start, end: e.end }))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 }

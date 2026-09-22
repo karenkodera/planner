@@ -18,13 +18,13 @@ import { CalendarEvent, SharedRequest, TravelStay } from '../types/calendar';
 import { colors } from '../theme/colors';
 import { useCalendar } from '../store/CalendarContext';
 import {
-  eventTouchesDay,
   format,
   formatEventTime,
   isSameDay,
   overlaps,
   travelTouchesDay,
 } from '../utils/date';
+import { occurrenceOnDay, recurrenceLabel } from '../utils/recurrence';
 
 const HOUR_HEIGHT = 64;
 const DAY_START = 8;
@@ -166,7 +166,9 @@ function DayTimelinePage({
   onSelectTravel: (t: TravelStay) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
-  const dayEvents = events.filter((e) => eventTouchesDay(e.start, e.end, day));
+  const dayEvents = events
+    .map((e) => occurrenceOnDay(e, day))
+    .filter((e): e is CalendarEvent => e != null);
   const mine = dayEvents.filter((e) => e.owner === 'me');
   const partner = dayEvents.filter((e) => e.owner === 'partner');
   const shared = dayEvents.filter((e) => e.owner === 'shared');
@@ -321,11 +323,13 @@ function EventInfoPanel({
   onClose,
   onOpenRequest,
   onCancelInvite,
+  onEditEvent,
 }: {
   selection: Selection;
   onClose: () => void;
   onOpenRequest: (r: SharedRequest) => void;
   onCancelInvite: (r: SharedRequest) => void;
+  onEditEvent: (event: CalendarEvent) => void;
 }) {
   const { couple } = useCalendar();
   if (!selection) return null;
@@ -406,6 +410,7 @@ function EventInfoPanel({
       : event.owner === 'partner'
         ? couple.partner.name
         : 'Together';
+  const canEdit = event.owner === 'me' || event.owner === 'shared';
 
   return (
     <View style={styles.infoPanel}>
@@ -417,6 +422,9 @@ function EventInfoPanel({
       </View>
       <Text style={styles.infoTitle}>{event.title}</Text>
       <Text style={styles.infoMeta}>{formatEventTime(event.start, event.end)}</Text>
+      {event.recurrence && event.recurrence !== 'none' ? (
+        <Text style={styles.infoRepeat}>{recurrenceLabel(event.recurrence)}</Text>
+      ) : null}
       {event.location ? (
         <View style={styles.infoLocationRow}>
           <Ionicons name="location-outline" size={14} color={colors.ink} />
@@ -424,6 +432,11 @@ function EventInfoPanel({
         </View>
       ) : null}
       {event.notes ? <Text style={styles.infoNotes}>{event.notes}</Text> : null}
+      {canEdit ? (
+        <Pressable style={styles.infoAction} onPress={() => onEditEvent(event)}>
+          <Text style={styles.infoActionText}>Edit event</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -437,22 +450,25 @@ export function DayDetailModal({
   initialDay: Date;
   onClose: () => void;
 }) {
-  const { events, requests, travels, setSelectedDay, openSheet, today, couple, declineRequest } =
+  const { events, requests, travels, setSelectedDay, openSheet, today, couple, declineRequest, jumpToDay } =
     useCalendar();
   const pagerRef = useRef<ScrollView>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  const lastHeaderTap = useRef(0);
+  const [anchorDay, setAnchorDay] = useState(initialDay);
 
   const days = useMemo(() => {
-    const start = addDays(initialDay, -14);
+    const start = addDays(anchorDay, -14);
     return Array.from({ length: 29 }, (_, i) => addDays(start, i));
-  }, [initialDay]);
+  }, [anchorDay]);
 
   const initialIndex = 14;
   const [pageIndex, setPageIndex] = useState(initialIndex);
-  const currentDay = days[pageIndex] ?? initialDay;
+  const currentDay = days[pageIndex] ?? anchorDay;
 
   useEffect(() => {
     if (!visible) return;
+    setAnchorDay(initialDay);
     setPageIndex(initialIndex);
     setSelection(null);
     requestAnimationFrame(() => {
@@ -470,6 +486,23 @@ export function DayDetailModal({
     }
   };
 
+  const onHeaderPress = () => {
+    const now = Date.now();
+    if (now - lastHeaderTap.current < 320) {
+      setAnchorDay(today);
+      jumpToDay(today);
+      setPageIndex(initialIndex);
+      setSelection(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      requestAnimationFrame(() => {
+        pagerRef.current?.scrollTo({ x: SCREEN_W * initialIndex, animated: true });
+      });
+      lastHeaderTap.current = 0;
+      return;
+    }
+    lastHeaderTap.current = now;
+  };
+
   return (
     <Modal
       visible={visible}
@@ -480,13 +513,13 @@ export function DayDetailModal({
       <SafeAreaView style={styles.shell} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.sheetHandle} />
         <View style={styles.header}>
-          <View style={styles.headerCenter}>
+          <Pressable onPress={onHeaderPress} style={styles.headerCenter}>
             <Text style={styles.headerDow}>
               {format(currentDay, 'EEEE')}
               {isSameDay(currentDay, today) ? ' · Today' : ''}
             </Text>
             <Text style={styles.headerDate}>{format(currentDay, 'MMMM d, yyyy')}</Text>
-          </View>
+          </Pressable>
         </View>
 
         <ScrollView
@@ -534,6 +567,11 @@ export function DayDetailModal({
             declineRequest(request.id);
             setSelection(null);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }}
+          onEditEvent={(event) => {
+            setSelection(null);
+            onClose();
+            setTimeout(() => openSheet({ type: 'edit', event }), 280);
           }}
         />
       </SafeAreaView>
@@ -783,6 +821,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     fontSize: 14,
     color: colors.inkSoft,
+    marginTop: 4,
+  },
+  infoRepeat: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: colors.muted,
     marginTop: 4,
   },
   infoLocationRow: {
