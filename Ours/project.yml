@@ -1,0 +1,53 @@
+name: Ours
+options:
+  bundleIdPrefix: us.kodera
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+targets:
+  Ours:
+    type: application
+    platform: iOS
+    sources:
+      - path: Ours
+        excludes:
+          - Info.plist
+          - Resources
+          - Assets.xcassets
+      - path: Fonts/Poppins-Regular.ttf
+        buildPhase: resources
+      - path: Fonts/Poppins-Medium.ttf
+        buildPhase: resources
+      - path: Fonts/Poppins-SemiBold.ttf
+        buildPhase: resources
+      - path: Fonts/Poppins-Bold.ttf
+        buildPhase: resources
+      - path: Fonts/IBMPlexMono-Regular.ttf
+        buildPhase: resources
+      - path: Fonts/IBMPlexMono-Medium.ttf
+        buildPhase: resources
+      - path: Ours/Assets.xcassets
+        buildPhase: resources
+    info:
+      path: Ours/Info.plist
+      properties:
+        CFBundleDisplayName: Ours
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIAppFonts:
+          - Poppins-Regular.ttf
+          - Poppins-Medium.ttf
+          - Poppins-SemiBold.ttf
+          - Poppins-Bold.ttf
+          - IBMPlexMono-Regular.ttf
+          - IBMPlexMono-Medium.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: us.kodera.ours
+        PRODUCT_NAME: Ours
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
