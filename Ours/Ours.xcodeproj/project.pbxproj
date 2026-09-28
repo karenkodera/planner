@@ -18,6 +18,7 @@
 		47CAAF4E11018AE255C1294A /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF9520E9738190D400C08F8 /* Colors.swift */; };
 		51A493A95FE1278EBC74937D /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28A3C95A81D955D2EF66A0F4 /* MockData.swift */; };
 		5F512D279291CC6B1C5037CD /* DateUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54EF1672E403283C7507544E /* DateUtils.swift */; };
+		639918AF67851362BA69860C /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1B5EA9B509070C6CE10EC3 /* OnboardingView.swift */; };
 		72DCC8ACD0B75CEA09641301 /* CalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C093246633FA16B5A1DDA6 /* CalendarModels.swift */; };
 		7432BE9A27857F1E3ED94C44 /* Poppins-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 697A7BFE7627BE0927AC9CEB /* Poppins-Regular.ttf */; };
 		78F28FC3A3A76FC537902C76 /* FindTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7537BF3975E746171F851C28 /* FindTime.swift */; };
@@ -52,6 +53,7 @@
 		85AC158022DFCB9F7FFFC36B /* CalendarStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarStore.swift; sourceTree = "<group>"; };
 		8D0600073101C29D6D30E53B /* VoiceParse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceParse.swift; sourceTree = "<group>"; };
 		A8B3972946066B230394FF55 /* WeekCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendarView.swift; sourceTree = "<group>"; };
+		AF1B5EA9B509070C6CE10EC3 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B1DEDB754487A69B8DA01662 /* SheetLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetLayout.swift; sourceTree = "<group>"; };
 		B995F6DA016AB493FCF92B54 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		BD91F401FE304DC56188EF05 /* Poppins-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Poppins-Medium.ttf"; sourceTree = "<group>"; };
@@ -168,6 +170,7 @@
 				E3335DF1C3E7FFF6AC284AB9 /* DayDetailView.swift */,
 				779FABAD9E4A3B176B86458D /* GuestBookingView.swift */,
 				BE8250A2BC34E822ED49C01F /* HomeView.swift */,
+				AF1B5EA9B509070C6CE10EC3 /* OnboardingView.swift */,
 				595C5157D8A4CFCF5902DC4F /* ProfileView.swift */,
 				602862170E8BDB8A9276F798 /* SheetsView.swift */,
 				A8B3972946066B230394FF55 /* WeekCalendarView.swift */,
@@ -258,6 +261,7 @@
 				FB83C29F81DEFD55B3316A8E /* GuestBookingView.swift in Sources */,
 				E17C5E592806A8A96701FD66 /* HomeView.swift in Sources */,
 				51A493A95FE1278EBC74937D /* MockData.swift in Sources */,
+				639918AF67851362BA69860C /* OnboardingView.swift in Sources */,
 				AF947D745CA945AABBED26BA /* OursApp.swift in Sources */,
 				367C857F288BDD313AEB760C /* OwnerBadges.swift in Sources */,
 				CACB29FFAEA4EC603608C408 /* ProfileView.swift in Sources */,

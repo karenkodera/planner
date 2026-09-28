@@ -100,7 +100,13 @@ struct DayDetailView: View {
         EventInfoPanel(
           selection: selection,
           onClose: { self.selection = nil },
-          onOpenRequest: { store.openSheet(.requestDetail($0)) },
+          onOpenRequest: { request in
+            self.selection = nil
+            isPresented = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+              store.openSheet(.requestDetail(request))
+            }
+          },
           onCancelInvite: {
             store.declineRequest(id: $0.id)
             self.selection = nil
@@ -506,7 +512,7 @@ struct EventInfoPanel: View {
       Button {
         onOpenRequest(request)
       } label: {
-        Text(request.from == .me ? "View invite" : "RSVP")
+        Text(request.from == .me ? "Edit invite" : "RSVP")
           .font(AppFont.poppins(.medium, size: 14))
           .foregroundStyle(AppColor.white)
           .frame(maxWidth: .infinity)

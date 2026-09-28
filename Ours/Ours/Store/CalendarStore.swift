@@ -3,9 +3,9 @@ import SwiftUI
 
 @MainActor
 final class CalendarStore: ObservableObject {
-  let couple = MockData.couple
   let today = MockData.today
 
+  @Published var couple = MockData.couple
   @Published var weekAnchor: Date
   @Published var selectedDay: Date
   @Published var events: [CalendarEvent]
@@ -16,6 +16,14 @@ final class CalendarStore: ObservableObject {
   @Published var partnerLinked = true
   @Published var dayDetailDay: Date?
   @Published var dayDetailSelection: TimelineSelection?
+  /// How the current user signed in — drives Account row label in settings.
+  @Published var meLoginMethod: LoginMethod = .email
+
+  enum LoginMethod {
+    case phone
+    case email
+    case google
+  }
 
   init() {
     weekAnchor = MockData.today
@@ -23,6 +31,23 @@ final class CalendarStore: ObservableObject {
     events = MockData.events
     requests = MockData.requests
     travels = MockData.travels
+  }
+
+  func updateMeProfile(name: String, contact: String, method: LoginMethod) {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let short = trimmed.split(separator: " ").first.map(String.init) ?? trimmed
+    let initial = String(trimmed.prefix(1)).uppercased()
+    couple.me.name = trimmed
+    couple.me.shortName = short
+    couple.me.initial = initial
+    meLoginMethod = method
+    let trimmedContact = contact.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmedContact.isEmpty {
+      couple.me.email = trimmedContact
+    } else if method == .google {
+      couple.me.email = "Signed in with Google"
+    }
   }
 
   var pendingCount: Int {
@@ -179,6 +204,22 @@ final class CalendarStore: ObservableObject {
   func declineRequest(id: String) {
     guard let idx = requests.firstIndex(where: { $0.id == id }) else { return }
     requests[idx].status = .declined
+  }
+
+  func updateRequest(
+    id: String,
+    title: String,
+    notes: String?,
+    location: String?,
+    start: Date,
+    end: Date
+  ) {
+    guard let idx = requests.firstIndex(where: { $0.id == id }) else { return }
+    requests[idx].title = title
+    requests[idx].notes = notes
+    requests[idx].location = location
+    requests[idx].proposedStart = start
+    requests[idx].proposedEnd = end
   }
 
   func createFromSlot(

@@ -1069,12 +1069,18 @@ struct RequestsSheet: View {
   @State private var endMinute = 0
   @State private var openDropdown: Dropdown?
   @State private var showDeclineConfirm = false
+  @State private var showCancelConfirm = false
+  @State private var editTitle = ""
+  @State private var editLocation = ""
+  @State private var editNotes = ""
 
-  enum Step { case detail, suggestTime }
+  enum Step { case detail, suggestTime, edit }
   enum Dropdown { case date, startTime, endTime }
 
   private var detail: SharedRequest? {
-    if case .requestDetail(let r) = store.sheet { return r }
+    if case .requestDetail(let r) = store.sheet {
+      return store.requests.first(where: { $0.id == r.id }) ?? r
+    }
     return nil
   }
 
@@ -1093,11 +1099,17 @@ struct RequestsSheet: View {
     return end <= suggestedStart ? DateUtils.addMinutes(suggestedStart, 30) : end
   }
 
+  private var canSaveEdit: Bool {
+    !editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
   var body: some View {
     Group {
       if let detail {
         if step == .suggestTime {
           suggestTimeView(detail)
+        } else if detail.from == .me && detail.status == .pending {
+          editInviteView(detail)
         } else {
           detailView(detail)
         }
@@ -1106,11 +1118,13 @@ struct RequestsSheet: View {
       }
     }
     .onAppear {
-      step = .detail
       openDropdown = nil
       showDeclineConfirm = false
+      showCancelConfirm = false
+      step = .detail
       if case .requestDetail(let r) = store.sheet {
         seedTimes(from: r)
+        seedEditFields(from: r)
       }
     }
     .alert("Decline invite?", isPresented: $showDeclineConfirm) {
@@ -1123,6 +1137,17 @@ struct RequestsSheet: View {
       }
     } message: {
       Text("Are you sure you want to decline this invite?")
+    }
+    .alert("Cancel invite?", isPresented: $showCancelConfirm) {
+      Button("Keep invite", role: .cancel) {}
+      Button("Cancel invite", role: .destructive) {
+        if let detail {
+          store.declineRequest(id: detail.id)
+          store.closeSheet()
+        }
+      }
+    } message: {
+      Text("This invite will be withdrawn. \(store.couple.partner.name) won’t see it anymore.")
     }
   }
 
@@ -1137,6 +1162,12 @@ struct RequestsSheet: View {
     endHour = DateUtils.calendar.component(.hour, from: end)
     let endMin = DateUtils.calendar.component(.minute, from: end)
     endMinute = endMin < 30 ? 0 : 30
+  }
+
+  private func seedEditFields(from request: SharedRequest) {
+    editTitle = request.title
+    editLocation = request.location ?? ""
+    editNotes = request.notes ?? ""
   }
 
   private var listView: some View {
@@ -1250,20 +1281,106 @@ struct RequestsSheet: View {
           store.closeSheet()
         }
       }
+    }
+  }
 
-      if detail.status == .pending && detail.from == .me {
-        Button {
-          store.declineRequest(id: detail.id)
-          store.closeSheet()
-        } label: {
-          Text("Cancel invite")
-            .font(AppType.bodyMedium)
-            .foregroundStyle(AppColor.danger)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+  private func editInviteView(_ detail: SharedRequest) -> some View {
+    SheetChrome(
+      title: "Edit invite",
+      subtitle: "Awaiting reply from \(store.couple.partner.name)",
+      onClose: { store.closeSheet() }
+    ) {
+      editFieldLabel("Title")
+      TextField("Invite title", text: $editTitle)
+        .font(AppType.body)
+        .padding(14)
+        .background(AppColor.fill)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+      editFieldLabel("Location").padding(.top, 14)
+      TextField("Add a place", text: $editLocation)
+        .font(AppType.body)
+        .padding(14)
+        .background(AppColor.fill)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+      editFieldLabel("Notes").padding(.top, 14)
+      TextField("Add a note", text: $editNotes, axis: .vertical)
+        .font(AppType.body)
+        .lineLimit(2...4)
+        .padding(14)
+        .background(AppColor.fill)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+      suggestDateCalendarDropdown
+        .padding(.top, 14)
+
+      HStack(alignment: .top, spacing: 10) {
+        suggestTimeDropdown(
+          label: "Start",
+          value: DateUtils.format(suggestedStart, "h:mm a"),
+          isOpen: openDropdown == .startTime,
+          selectedId: timeId(startHour, startMinute),
+          toggle: { openDropdown = openDropdown == .startTime ? nil : .startTime }
+        ) {
+          timeMenu(selectedHour: startHour, selectedMinute: startMinute) { hour, minute in
+            startHour = hour
+            startMinute = minute
+            openDropdown = nil
+          }
+        }
+
+        suggestTimeDropdown(
+          label: "End",
+          value: DateUtils.format(suggestedEnd, "h:mm a"),
+          isOpen: openDropdown == .endTime,
+          selectedId: timeId(endHour, endMinute),
+          toggle: { openDropdown = openDropdown == .endTime ? nil : .endTime }
+        ) {
+          timeMenu(selectedHour: endHour, selectedMinute: endMinute) { hour, minute in
+            endHour = hour
+            endMinute = minute
+            openDropdown = nil
+          }
         }
       }
+      .padding(.top, 14)
+
+      PrimaryButton(title: "Save changes", disabled: !canSaveEdit) {
+        let trimmedTitle = editTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLocation = editLocation.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = editNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        store.updateRequest(
+          id: detail.id,
+          title: trimmedTitle,
+          notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+          location: trimmedLocation.isEmpty ? nil : trimmedLocation,
+          start: suggestedStart,
+          end: suggestedEnd
+        )
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        store.closeSheet()
+      }
+
+      Button {
+        showCancelConfirm = true
+      } label: {
+        Text("Cancel invite")
+          .font(AppType.bodyMedium)
+          .foregroundStyle(AppColor.danger)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 16)
+      }
     }
+  }
+
+  private func editFieldLabel(_ text: String) -> some View {
+    Text(text)
+      .font(AppFont.poppins(.medium, size: 11))
+      .tracking(0.4)
+      .textCase(.uppercase)
+      .foregroundStyle(AppColor.muted)
+      .padding(.bottom, 8)
   }
 
   private func suggestTimeView(_ detail: SharedRequest) -> some View {

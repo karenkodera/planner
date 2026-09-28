@@ -181,9 +181,6 @@ struct ProfileView: View {
         Text(store.couple.me.name)
           .font(AppFont.poppins(.semibold, size: 22))
           .foregroundStyle(AppColor.ink)
-        Text(store.couple.me.email)
-          .font(AppFont.poppins(.regular, size: 14))
-          .foregroundStyle(AppColor.muted)
       }
       .frame(maxWidth: .infinity)
       .padding(.top, 8)
@@ -193,9 +190,11 @@ struct ProfileView: View {
       card {
         detailRow("Name", store.couple.me.name)
         divider
-        detailRow("Email", store.couple.me.email)
-        divider
-        detailRow("Password", "••••••••")
+        detailRow(accountContactLabel, store.couple.me.email)
+        if store.meLoginMethod != .phone && store.meLoginMethod != .google {
+          divider
+          detailRow("Password", "••••••••")
+        }
       }
       sectionLabel("Shared with")
       card {
@@ -211,14 +210,9 @@ struct ProfileView: View {
                 .frame(width: 40, height: 40)
                 .background(AppColor.partner)
                 .clipShape(Circle())
-              VStack(alignment: .leading, spacing: 2) {
-                Text(store.couple.partner.name)
-                  .font(AppFont.poppins(.medium, size: 15))
-                  .foregroundStyle(AppColor.ink)
-                Text(store.couple.partner.email)
-                  .font(AppFont.poppins(.regular, size: 13))
-                  .foregroundStyle(AppColor.muted)
-              }
+              Text(store.couple.partner.name)
+                .font(AppFont.poppins(.medium, size: 15))
+                .foregroundStyle(AppColor.ink)
               Spacer()
               Image(systemName: "chevron.forward")
                 .font(.system(size: 14))
@@ -235,6 +229,12 @@ struct ProfileView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
+      Text("You can only invite one person to share calendars indefinitely at a time.")
+        .font(AppFont.poppins(.regular, size: 12))
+        .foregroundStyle(AppColor.muted)
+        .padding(.horizontal, 4)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
       sectionLabel("Share")
       card {
@@ -242,44 +242,13 @@ struct ProfileView: View {
           shareKind = .availability
           showShareSheet = true
         }
-        divider
-        if store.partnerLinked {
-          Button {
-            UISelectionFeedbackGenerator().selectionChanged()
-            showRemovePartnerAlert = true
-          } label: {
-            HStack(spacing: 12) {
-              Image(systemName: "person.badge.minus")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(AppColor.danger)
-                .frame(width: 28)
-              VStack(alignment: .leading, spacing: 2) {
-                Text("Unshare calendar with \(store.couple.partner.shortName)")
-                  .font(AppFont.poppins(.medium, size: 15))
-                  .foregroundStyle(AppColor.danger)
-                  .multilineTextAlignment(.leading)
-                Text("Stop sharing calendars indefinitely")
-                  .font(AppFont.poppins(.regular, size: 12))
-                  .foregroundStyle(AppColor.muted)
-                  .multilineTextAlignment(.leading)
-              }
-              Spacer(minLength: 8)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-          }
-        } else {
+        if !store.partnerLinked {
+          divider
           shareActionRow(.calendar) {
             showCalendarShareWarning = true
           }
         }
       }
-      Text("You can only invite one person to share calendars indefinitely at a time.")
-        .font(AppFont.poppins(.regular, size: 12))
-        .foregroundStyle(AppColor.muted)
-        .padding(.horizontal, 4)
-        .padding(.bottom, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
 
       sectionLabel("Preferences")
       card {
@@ -311,6 +280,13 @@ struct ProfileView: View {
     }
   }
 
+  private var accountContactLabel: String {
+    switch store.meLoginMethod {
+    case .phone: return "Phone number"
+    case .email, .google: return "Email"
+    }
+  }
+
   private var partnerPage: some View {
     VStack(spacing: 0) {
       VStack(spacing: 6) {
@@ -324,19 +300,11 @@ struct ProfileView: View {
         Text(store.couple.partner.name)
           .font(AppFont.poppins(.semibold, size: 22))
           .foregroundStyle(AppColor.ink)
-        Text(store.couple.partner.email)
-          .font(AppFont.poppins(.regular, size: 14))
-          .foregroundStyle(AppColor.muted)
       }
       .padding(.top, 8)
       .padding(.bottom, 24)
 
-      sectionLabel("Account")
-      card {
-        detailRow("Name", store.couple.partner.name)
-        divider
-        detailRow("Email", store.couple.partner.email)
-      }
+      sectionLabel("Sharing")
       card {
         Button {
           UINotificationFeedbackGenerator().notificationOccurred(.warning)
@@ -344,17 +312,25 @@ struct ProfileView: View {
         } label: {
           HStack(spacing: 12) {
             Image(systemName: "person.badge.minus")
+              .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(AppColor.danger)
-            Text("Remove from calendar")
-              .font(AppFont.poppins(.medium, size: 15))
-              .foregroundStyle(AppColor.danger)
-            Spacer()
+              .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Unshare calendar with \(store.couple.partner.shortName)")
+                .font(AppFont.poppins(.medium, size: 15))
+                .foregroundStyle(AppColor.danger)
+                .multilineTextAlignment(.leading)
+              Text("Stop sharing calendars indefinitely")
+                .font(AppFont.poppins(.regular, size: 12))
+                .foregroundStyle(AppColor.muted)
+                .multilineTextAlignment(.leading)
+            }
+            Spacer(minLength: 8)
           }
           .padding(.horizontal, 16)
           .padding(.vertical, 14)
         }
       }
-      .padding(.top, 8)
     }
   }
 
