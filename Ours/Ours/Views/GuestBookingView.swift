@@ -45,20 +45,22 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
   ]
 }
 
-/// Guest web / in-app booking experience for shared availability (OpenTable-style).
+/// Logged-in guest picks a mutual free window and sends a request. Event titles stay private.
 struct GuestBookingView: View {
   @EnvironmentObject private var store: CalendarStore
+  let session: GuestBookingSession
   @Binding var isPresented: Bool
   @State private var step: Step = .times
+  @State private var slots: [FreeSlot] = []
   @State private var selectedSlot: FreeSlot?
-  @State private var guestName = ""
-  @State private var guestPhone = ""
+  @State private var title = "Time together"
   @State private var sent = false
+  @State private var sending = false
 
-  enum Step { case times, phone, done }
+  enum Step { case times, title, done }
 
-  private var slots: [FreeSlot] {
-    store.freeSlots(scope: .solo)
+  private var canSend: Bool {
+    !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !sending
   }
 
   private var slotsByDay: [(String, [FreeSlot])] {
@@ -74,15 +76,10 @@ struct GuestBookingView: View {
     return order.map { ($0, map[$0] ?? []) }
   }
 
-  private var canConfirmPhone: Bool {
-    guestName.trimmingCharacters(in: .whitespaces).count >= 2
-      && guestPhone.filter(\.isNumber).count >= 10
-  }
-
   var body: some View {
     VStack(spacing: 0) {
       HStack {
-        if step == .phone {
+        if step == .title {
           Button {
             step = .times
             UISelectionFeedbackGenerator().selectionChanged()
@@ -111,7 +108,7 @@ struct GuestBookingView: View {
       Group {
         switch step {
         case .times: timesStep
-        case .phone: phoneStep
+        case .title: titleStep
         case .done: doneStep
         }
       }
@@ -122,22 +119,25 @@ struct GuestBookingView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .background(AppColor.white)
     .presentationDragIndicator(.hidden)
+    .task {
+      slots = await store.loadGuestSlots(sessionId: session.id)
+    }
   }
 
   private var timesStep: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: 12) {
-        Text(store.couple.me.initial)
+        Text(session.hostInitial)
           .font(AppFont.poppins(.semibold, size: 18))
           .foregroundStyle(AppColor.white)
           .frame(width: 44, height: 44)
-          .background(store.meColor)
+          .background(AppColor.partner)
           .clipShape(Circle())
         VStack(alignment: .leading, spacing: 2) {
-          Text("Book time with \(store.couple.me.name)")
+          Text("Find time with \(session.hostName)")
             .font(AppFont.poppins(.semibold, size: 18))
             .foregroundStyle(AppColor.ink)
-          Text("Open times · pick one to send an invite")
+          Text("Open windows for both of you")
             .font(AppFont.poppins(.regular, size: 13))
             .foregroundStyle(AppColor.muted)
         }
@@ -172,19 +172,19 @@ struct GuestBookingView: View {
       }
 
       PrimaryButton(title: "Continue", disabled: selectedSlot == nil) {
-        step = .phone
+        step = .title
         UISelectionFeedbackGenerator().selectionChanged()
       }
     }
   }
 
-  private var phoneStep: some View {
+  private var titleStep: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("Confirm your number")
+      Text("Send a time")
         .font(AppFont.poppins(.semibold, size: 20))
         .foregroundStyle(AppColor.ink)
         .padding(.bottom, 8)
-      Text("\(store.couple.me.name) can send updates or cancellations to this number. No Ours account needed.")
+      Text("\(session.hostName) will see the request. They won’t see the rest of your calendar.")
         .font(AppFont.poppins(.regular, size: 14))
         .foregroundStyle(AppColor.muted)
         .padding(.bottom, 20)
@@ -200,26 +200,26 @@ struct GuestBookingView: View {
           .padding(.bottom, 16)
       }
 
-      field("Your name", text: $guestName, keyboard: .default)
-        .padding(.bottom, 12)
-      field("Phone number", text: $guestPhone, keyboard: .phonePad)
+      field("Plan name", text: $title, keyboard: .default)
 
       Spacer(minLength: 16)
 
-      PrimaryButton(title: "Send invite to \(store.couple.me.name)", disabled: !canConfirmPhone) {
+      PrimaryButton(title: sending ? "Sending…" : "Send invite to \(session.hostName)", disabled: !canSend) {
         guard let slot = selectedSlot else { return }
-        let name = guestName.trimmingCharacters(in: .whitespaces)
-        store.receiveGuestBooking(
-          title: "Plan with \(name)",
-          start: slot.start,
-          end: slot.end,
-          guestName: name,
-          guestPhone: guestPhone
-        )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-          step = .done
-          sent = true
+        sending = true
+        let plan = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+          do {
+            try await store.sendGuestRequest(session: session, title: plan, start: slot.start, end: slot.end)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+              step = .done
+              sent = true
+            }
+          } catch {
+            store.lastError = error.localizedDescription
+          }
+          sending = false
         }
       }
     }
@@ -235,7 +235,7 @@ struct GuestBookingView: View {
       Text("Invite sent")
         .font(AppFont.poppins(.semibold, size: 20))
         .foregroundStyle(AppColor.ink)
-      Text("\(store.couple.me.name) will get your request and can confirm or suggest another time.")
+      Text("\(session.hostName) will get your request and can confirm or suggest another time.")
         .font(AppFont.poppins(.regular, size: 14))
         .foregroundStyle(AppColor.muted)
         .multilineTextAlignment(.center)

@@ -76,6 +76,23 @@ struct SharedRequest: Identifiable, Hashable {
   var from: PersonId
   var status: RequestStatus
   var createdAt: Date
+  /// The other person's name. Incoming requests use this instead of the couple partner.
+  var senderName: String? = nil
+  var partnershipId: String? = nil
+  var shareSessionId: String? = nil
+}
+
+struct GuestBookingSession: Identifiable, Equatable {
+  let id: UUID
+  let hostId: UUID
+  var hostName: String
+  var hostInitial: String
+}
+
+struct AvailabilityLink: Identifiable, Equatable {
+  let id: UUID
+  let expiresAt: Date
+  let status: String
 }
 
 struct FreeSlot: Identifiable, Hashable {

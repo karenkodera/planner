@@ -1,4 +1,8 @@
 name: Ours
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    exactVersion: 2.55.3
 options:
   bundleIdPrefix: us.kodera
   deploymentTarget:
@@ -9,6 +13,14 @@ targets:
   Ours:
     type: application
     platform: iOS
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    entitlements:
+      path: Ours/Ours.entitlements
     sources:
       - path: Ours
         excludes:
@@ -43,6 +55,12 @@ targets:
           - Poppins-Bold.ttf
           - IBMPlexMono-Regular.ttf
           - IBMPlexMono-Medium.ttf
+        CFBundleURLTypes:
+          - CFBundleURLName: us.kodera.ours
+            CFBundleURLSchemes:
+              - ours
+        SUPABASE_URL: $(SUPABASE_URL)
+        SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: us.kodera.ours

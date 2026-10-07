@@ -11,6 +11,8 @@ xcuserdata/
 
 # local env files
 .env*.local
+Ours/Secrets.xcconfig
+supabase/.temp/
 
 # local agent notes
 .claude/

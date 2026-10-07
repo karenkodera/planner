@@ -72,6 +72,21 @@ struct HomeView: View {
       SheetsHost()
         .environmentObject(store)
     }
+    .sheet(item: $store.guestBooking) { session in
+      GuestBookingView(session: session, isPresented: Binding(
+        get: { store.guestBooking != nil },
+        set: { if !$0 { store.guestBooking = nil } }
+      ))
+      .environmentObject(store)
+    }
+    .alert("Something went wrong", isPresented: Binding(
+      get: { store.lastError != nil },
+      set: { if !$0 { store.lastError = nil } }
+    )) {
+      Button("OK", role: .cancel) { store.lastError = nil }
+    } message: {
+      Text(store.lastError ?? "")
+    }
   }
 
   @ViewBuilder

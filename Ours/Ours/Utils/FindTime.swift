@@ -1,7 +1,6 @@
 import Foundation
 
 enum FindTime {
-  private static let weekdayStart = 17
   private static let weekendStart = 10
   private static let dayEnd = 22
   private static let minSlot = 45
@@ -15,6 +14,7 @@ enum FindTime {
     events: [CalendarEvent],
     weekAnchor: Date,
     scope: FindTimeScope,
+    weekdayStartHour: Int = 17,
     maxSlots: Int = 8
   ) -> [FreeSlot] {
     switch scope {
@@ -22,7 +22,11 @@ enum FindTime {
       return slotsFromGaps(
         weekAnchor: weekAnchor,
         gapProvider: { day in
-          freeGaps(busyForPerson(events, day: day, owners: [.me, .shared]), day: day)
+          freeGaps(
+            busyForPerson(events, day: day, owners: [.me, .shared]),
+            day: day,
+            weekdayStartHour: weekdayStartHour
+          )
         },
         maxSlots: maxSlots
       )
@@ -30,13 +34,49 @@ enum FindTime {
       return slotsFromGaps(
         weekAnchor: weekAnchor,
         gapProvider: { day in
-          let mine = freeGaps(busyForPerson(events, day: day, owners: [.me, .shared]), day: day)
-          let theirs = freeGaps(busyForPerson(events, day: day, owners: [.partner, .shared]), day: day)
+          let mine = freeGaps(
+            busyForPerson(events, day: day, owners: [.me, .shared]),
+            day: day,
+            weekdayStartHour: weekdayStartHour
+          )
+          let theirs = freeGaps(
+            busyForPerson(events, day: day, owners: [.partner, .shared]),
+            day: day,
+            weekdayStartHour: weekdayStartHour
+          )
           return intersectGaps(mine, theirs)
         },
         maxSlots: maxSlots
       )
     }
+  }
+
+  /// Open windows where my calendar and another person's busy blocks are both free.
+  static func findMutualSlots(
+    myEvents: [CalendarEvent],
+    otherBusy: [DateInterval],
+    weekAnchor: Date,
+    weekdayStartHour: Int = 17,
+    maxSlots: Int = 8
+  ) -> [FreeSlot] {
+    slotsFromGaps(
+      weekAnchor: weekAnchor,
+      gapProvider: { day in
+        let mine = freeGaps(
+          busyForPerson(myEvents, day: day, owners: [.me, .shared]),
+          day: day,
+          weekdayStartHour: weekdayStartHour
+        )
+        let dayStart = DateUtils.startOfDay(day)
+        let dayEnd = DateUtils.addDays(dayStart, 1)
+        let theirsBusy = otherBusy
+          .filter { $0.end > dayStart && $0.start < dayEnd }
+          .map { BusyInterval(start: max($0.start, dayStart), end: min($0.end, dayEnd)) }
+        let theirs = freeGaps(theirsBusy, day: day, weekdayStartHour: weekdayStartHour)
+        return intersectGaps(mine, theirs)
+      },
+      maxSlots: maxSlots
+    )
   }
 
   static func findMutualFreeSlots(
@@ -83,10 +123,11 @@ enum FindTime {
     return slots
   }
 
-  private static func dayWindowStart(_ day: Date) -> Date {
+  private static func dayWindowStart(_ day: Date, weekdayStartHour: Int) -> Date {
     let dow = DateUtils.calendar.component(.weekday, from: day)
     let isWeekend = dow == 1 || dow == 7
-    return DateUtils.atTime(day, hour: isWeekend ? weekendStart : weekdayStart)
+    let hour = min(max(weekdayStartHour, 0), 23)
+    return DateUtils.atTime(day, hour: isWeekend ? weekendStart : hour)
   }
 
   private static func busyForPerson(
@@ -116,8 +157,12 @@ enum FindTime {
     return merged
   }
 
-  private static func freeGaps(_ busy: [BusyInterval], day: Date) -> [BusyInterval] {
-    let windowStart = dayWindowStart(day)
+  private static func freeGaps(
+    _ busy: [BusyInterval],
+    day: Date,
+    weekdayStartHour: Int
+  ) -> [BusyInterval] {
+    let windowStart = dayWindowStart(day, weekdayStartHour: weekdayStartHour)
     let windowEnd = DateUtils.atTime(day, hour: dayEnd)
     let merged = mergeIntervals(
       busy.filter { DateUtils.overlaps($0.start, $0.end, windowStart, windowEnd) }

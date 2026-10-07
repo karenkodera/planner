@@ -1,0 +1,6 @@
+// Local secrets override these. xcconfig treats // as a comment, so URLs in
+// Secrets.xcconfig must be written as https:/$()/your-project.supabase.co
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+
+#include? "Secrets.xcconfig"

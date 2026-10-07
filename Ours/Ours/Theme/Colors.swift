@@ -30,15 +30,23 @@ enum AppColor {
   static let sharedDeep = Color(hex: 0xD12B4A)
 
   static let emptyPlans = Color(hex: 0xC7C7CC)
-  static let avatarColors: [Color] = [
-    me,
-    Color(hex: 0x5856D6),
-    Color(hex: 0xAF52DE),
-    Color(hex: 0xFF9500),
-    Color(hex: 0x34C759),
-    Color(hex: 0x30B0C7),
-    Color(hex: 0x1C1C1E),
+  static let avatarColors: [Color] = AvatarPalette.swatches.map(\.color)
+}
+
+enum AvatarPalette {
+  static let swatches: [(hex: String, color: Color)] = [
+    ("007AFF", AppColor.me),
+    ("5856D6", Color(hex: 0x5856D6)),
+    ("AF52DE", Color(hex: 0xAF52DE)),
+    ("FF9500", Color(hex: 0xFF9500)),
+    ("34C759", Color(hex: 0x34C759)),
+    ("30B0C7", Color(hex: 0x30B0C7)),
+    ("1C1C1E", Color(hex: 0x1C1C1E)),
   ]
+
+  static func color(hex: String) -> Color {
+    swatches.first { $0.hex.caseInsensitiveCompare(hex) == .orderedSame }?.color ?? AppColor.me
+  }
 }
 
 extension Color {

@@ -22,11 +22,13 @@
 		72DCC8ACD0B75CEA09641301 /* CalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C093246633FA16B5A1DDA6 /* CalendarModels.swift */; };
 		7432BE9A27857F1E3ED94C44 /* Poppins-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 697A7BFE7627BE0927AC9CEB /* Poppins-Regular.ttf */; };
 		78F28FC3A3A76FC537902C76 /* FindTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7537BF3975E746171F851C28 /* FindTime.swift */; };
+		A13E8F50E7038F7158D4A10D /* AppBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = D28AF5EBDB2ED1E40F1A0FB7 /* AppBackend.swift */; };
 		AF947D745CA945AABBED26BA /* OursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA662588ACBAC471AEDE7980 /* OursApp.swift */; };
 		BE7A38417CB75239BB65618D /* IBMPlexMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D0D62AB4844EB36BD698C435 /* IBMPlexMono-Regular.ttf */; };
 		C0F42787CE9D55DFAC39C160 /* WeekCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B3972946066B230394FF55 /* WeekCalendarView.swift */; };
 		C6BEDA3551608DF367479CD7 /* CalendarStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85AC158022DFCB9F7FFFC36B /* CalendarStore.swift */; };
 		CACB29FFAEA4EC603608C408 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595C5157D8A4CFCF5902DC4F /* ProfileView.swift */; };
+		CE3E0E89394BF0C6CD8AB0CF /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 77CC8B6212A4D5612A7E3672 /* Supabase */; };
 		D25E17BAB46C3DC8BBCA86C3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 38AFC94D94DA8D22AE46B359 /* Assets.xcassets */; };
 		D541C717B8B4530EB9BCAE0A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = B995F6DA016AB493FCF92B54 /* Typography.swift */; };
 		E17C5E592806A8A96701FD66 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8250A2BC34E822ED49C01F /* HomeView.swift */; };
@@ -61,9 +63,23 @@
 		C249EF5A1C6F573E8521B80E /* OwnerBadges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnerBadges.swift; sourceTree = "<group>"; };
 		CBF9520E9738190D400C08F8 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Colors.swift; sourceTree = "<group>"; };
 		D0D62AB4844EB36BD698C435 /* IBMPlexMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "IBMPlexMono-Regular.ttf"; sourceTree = "<group>"; };
+		D28AF5EBDB2ED1E40F1A0FB7 /* AppBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackend.swift; sourceTree = "<group>"; };
 		E3335DF1C3E7FFF6AC284AB9 /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
+		EA5188C9FEFC3FE6412F2810 /* Ours.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Ours.entitlements; sourceTree = "<group>"; };
 		FA662588ACBAC471AEDE7980 /* OursApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OursApp.swift; sourceTree = "<group>"; };
+		"TEMP_1E8A6348-2FD5-4948-AAFD-47177BEAD9B7" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7A7FAEFE3F79E6594732C051 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE3E0E89394BF0C6CD8AB0CF /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0FE44707422074E8107E23E3 /* Components */ = {
@@ -93,6 +109,14 @@
 				74BCA223CF1C7DBA4C7FDA81 /* Poppins-SemiBold.ttf */,
 			);
 			path = Fonts;
+			sourceTree = "<group>";
+		};
+		30A3B9D48334C3037B812D42 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D28AF5EBDB2ED1E40F1A0FB7 /* AppBackend.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		5690C4B640FD76BAD4B887FE = {
@@ -145,9 +169,11 @@
 			isa = PBXGroup;
 			children = (
 				38AFC94D94DA8D22AE46B359 /* Assets.xcassets */,
+				EA5188C9FEFC3FE6412F2810 /* Ours.entitlements */,
 				FA662588ACBAC471AEDE7980 /* OursApp.swift */,
 				26BC7EEFF6260C72C2C839B0 /* Data */,
 				DDF631FDC79F98E498CB940B /* Models */,
+				30A3B9D48334C3037B812D42 /* Services */,
 				79759DA5B32F2F251DD5869E /* Store */,
 				97938FE1209E8C0FC80FAF1A /* Theme */,
 				AA52659EDCEBB0AF87892F17 /* Utils */,
@@ -179,6 +205,14 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		"TEMP_C4F0E9A3-B949-4891-92A4-F73C0484AFBB" /* Ours */ = {
+			isa = PBXGroup;
+			children = (
+				"TEMP_1E8A6348-2FD5-4948-AAFD-47177BEAD9B7" /* Config.xcconfig */,
+			);
+			path = Ours;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -188,6 +222,7 @@
 			buildPhases = (
 				C1CBAB7C3409829E60106DE9 /* Sources */,
 				093873E85EDD3F00289A952B /* Resources */,
+				7A7FAEFE3F79E6594732C051 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -195,6 +230,7 @@
 			);
 			name = Ours;
 			packageProductDependencies = (
+				77CC8B6212A4D5612A7E3672 /* Supabase */,
 			);
 			productName = Ours;
 			productReference = 1EBCFB97206AB742F463B133 /* Ours.app */;
@@ -220,6 +256,9 @@
 			);
 			mainGroup = 5690C4B640FD76BAD4B887FE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A59A315B27CF239C91363E35 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9965349F9764EC4B4BCEE737 /* Products */;
 			projectDirPath = "";
@@ -252,6 +291,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A13E8F50E7038F7158D4A10D /* AppBackend.swift in Sources */,
 				72DCC8ACD0B75CEA09641301 /* CalendarModels.swift in Sources */,
 				C6BEDA3551608DF367479CD7 /* CalendarStore.swift in Sources */,
 				47CAAF4E11018AE255C1294A /* Colors.swift in Sources */,
@@ -279,9 +319,11 @@
 /* Begin XCBuildConfiguration section */
 		12EC9496744BA49D21D8DAD5 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_1E8A6348-2FD5-4948-AAFD-47177BEAD9B7" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Ours/Ours.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				INFOPLIST_FILE = Ours/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -297,9 +339,11 @@
 		};
 		452575759F03ED5BF4162B4D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_1E8A6348-2FD5-4948-AAFD-47177BEAD9B7" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Ours/Ours.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				INFOPLIST_FILE = Ours/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -454,6 +498,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A59A315B27CF239C91363E35 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 2.55.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		77CC8B6212A4D5612A7E3672 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A59A315B27CF239C91363E35 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DDC697B5484A705ED52D6C66 /* Project object */;
 }

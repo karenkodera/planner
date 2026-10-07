@@ -1,0 +1,19 @@
+project_id = "ours"
+
+[api]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "ours://auth-callback"
+additional_redirect_urls = ["ours://auth-callback", "ours://google-callback"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[functions.google-oauth]
+verify_jwt = false
+
+[functions.google-sync]
+verify_jwt = true

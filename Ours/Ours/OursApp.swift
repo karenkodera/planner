@@ -3,26 +3,26 @@ import SwiftUI
 @main
 struct OursApp: App {
   @StateObject private var store = CalendarStore()
-  @State private var hasCompletedOnboarding = false
 
   var body: some Scene {
     WindowGroup {
       Group {
-        if hasCompletedOnboarding {
+        if store.isRestoringSession {
+          ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppColor.canvas)
+        } else if store.isSignedIn {
           HomeView()
             .environmentObject(store)
             .transition(.opacity)
         } else {
-          OnboardingView {
-            withAnimation(.easeInOut(duration: 0.35)) {
-              hasCompletedOnboarding = true
-            }
-          }
-          .environmentObject(store)
-          .transition(.opacity)
+          OnboardingView()
+            .environmentObject(store)
+            .transition(.opacity)
         }
       }
       .preferredColorScheme(.light)
+      .onOpenURL { store.handleIncomingURL($0) }
     }
   }
 }

@@ -1,24 +1,24 @@
+import AuthenticationServices
+import CryptoKit
 import SwiftUI
 
 struct OnboardingView: View {
   @EnvironmentObject private var store: CalendarStore
-  var onFinished: () -> Void
+  @StateObject private var appleSignIn = AppleSignInCoordinator()
 
   @State private var phase: Phase = .explain
   @State private var page = 0
   @State private var appear = false
   @State private var name = ""
-  @State private var phone = ""
   @State private var email = ""
   @State private var password = ""
-  @State private var otp = ""
-  @State private var otpError = false
-  @State private var resendSeconds = 0
+  @State private var creatingAccount = true
+  @State private var authError: String?
+  @State private var busy = false
 
   private enum Phase {
     case explain
     case signup
-    case otp
     case email
   }
 
@@ -46,30 +46,10 @@ struct OnboardingView: View {
     ),
   ]
 
-  private var canSendCode: Bool {
-    !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      && phoneDigits.count >= 10
-  }
-
-  private var canVerifyOTP: Bool {
-    otp.filter(\.isNumber).count == 6
-  }
-
-  private var canCreateEmailAccount: Bool {
-    !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      && email.contains("@")
+  private var canSubmitEmail: Bool {
+    email.contains("@")
       && password.count >= 6
-  }
-
-  private var phoneDigits: String {
-    phone.filter(\.isNumber)
-  }
-
-  private var maskedPhone: String {
-    let digits = phoneDigits
-    guard digits.count >= 4 else { return phone }
-    let last4 = String(digits.suffix(4))
-    return "•••• \(last4)"
+      && (!creatingAccount || !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
   }
 
   var body: some View {
@@ -83,8 +63,6 @@ struct OnboardingView: View {
           explainContent
         case .signup:
           signupContent
-        case .otp:
-          otpContent
         case .email:
           emailContent
         }
@@ -147,85 +125,34 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 0) {
           signupHeader(
             title: "Create your account",
-            subtitle: "Start with your phone, or use email."
+            subtitle: "Sign in with Apple, Google, or email."
           )
 
-          VStack(spacing: 14) {
-            field("Your name", text: $name, keyboard: .default, contentType: .name)
-            field("Phone number", text: $phone, keyboard: .phonePad, contentType: .telephoneNumber)
+          if !store.isConfigured {
+            Text("Add SUPABASE_URL and SUPABASE_ANON_KEY in Ours/Secrets.xcconfig, then rebuild.")
+              .font(AppFont.poppins(.regular, size: 14))
+              .foregroundStyle(AppColor.danger)
+              .padding(.bottom, 16)
           }
-
-          PrimaryButton(title: "Send code", disabled: !canSendCode) {
-            sendCode()
-          }
-
-          orDivider
-            .padding(.top, 8)
-            .padding(.bottom, 18)
 
           VStack(spacing: 10) {
-            authOptionButton(
-              title: "Continue with Google",
-              systemImage: "g.circle.fill"
-            ) {
-              finishWithGoogle()
+            authOptionButton(title: "Sign in with Apple", systemImage: "apple.logo") {
+              startApple()
             }
-
-            authOptionButton(
-              title: "Continue with email",
-              systemImage: "envelope.fill"
-            ) {
-              withAnimation(.easeInOut(duration: 0.28)) {
-                phase = .email
-              }
+            authOptionButton(title: "Continue with Google", systemImage: "g.circle.fill") {
+              startGoogle()
+            }
+            authOptionButton(title: "Continue with email", systemImage: "envelope.fill") {
+              withAnimation(.easeInOut(duration: 0.28)) { phase = .email }
             }
           }
-        }
-        .padding(.horizontal, 28)
-        .padding(.bottom, 28)
-      }
-    }
-  }
 
-  private var otpContent: some View {
-    VStack(spacing: 0) {
-      ScrollView(showsIndicators: false) {
-        VStack(alignment: .leading, spacing: 0) {
-          signupHeader(
-            title: "Enter the code",
-            subtitle: "We sent a 6-digit code to \(maskedPhone)."
-          )
-
-          field("One-time code", text: $otp, keyboard: .numberPad, contentType: .oneTimeCode)
-            .onChange(of: otp) { _, value in
-              let digits = String(value.filter(\.isNumber).prefix(6))
-              if digits != value { otp = digits }
-              otpError = false
-            }
-
-          if otpError {
-            Text("That code didn’t work. Try again.")
+          if let authError, phase == .signup {
+            Text(authError)
               .font(AppFont.poppins(.regular, size: 13))
               .foregroundStyle(AppColor.danger)
-              .padding(.top, 10)
+              .padding(.top, 14)
           }
-
-          PrimaryButton(title: "Verify", disabled: !canVerifyOTP) {
-            verifyOTP()
-          }
-
-          Button {
-            guard resendSeconds == 0 else { return }
-            sendCode()
-          } label: {
-            Text(resendSeconds > 0 ? "Resend code in \(resendSeconds)s" : "Resend code")
-              .font(AppType.bodyMedium)
-              .foregroundStyle(resendSeconds > 0 ? AppColor.muted : AppColor.ink)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
-          }
-          .disabled(resendSeconds > 0)
-          .padding(.top, 4)
         }
         .padding(.horizontal, 28)
         .padding(.bottom, 28)
@@ -238,12 +165,16 @@ struct OnboardingView: View {
       ScrollView(showsIndicators: false) {
         VStack(alignment: .leading, spacing: 0) {
           signupHeader(
-            title: "Continue with email",
-            subtitle: "Use an email and password to sign in later."
+            title: creatingAccount ? "Create your account" : "Welcome back",
+            subtitle: creatingAccount
+              ? "Use an email and password to sign in later."
+              : "Sign in with the email you already use."
           )
 
           VStack(spacing: 14) {
-            field("Your name", text: $name, keyboard: .default, contentType: .name)
+            if creatingAccount {
+              field("Your name", text: $name, keyboard: .default, contentType: .name)
+            }
             field("Email", text: $email, keyboard: .emailAddress, contentType: .emailAddress)
             secureField("Password", text: $password)
           }
@@ -253,8 +184,29 @@ struct OnboardingView: View {
             .foregroundStyle(AppColor.muted)
             .padding(.top, 8)
 
-          PrimaryButton(title: "Create account", disabled: !canCreateEmailAccount) {
-            finishWithEmail()
+          if let authError {
+            Text(authError)
+              .font(AppFont.poppins(.regular, size: 13))
+              .foregroundStyle(AppColor.danger)
+              .padding(.top, 10)
+          }
+
+          PrimaryButton(
+            title: busy ? "Please wait…" : (creatingAccount ? "Create account" : "Sign in"),
+            disabled: !canSubmitEmail || busy
+          ) {
+            submitEmail()
+          }
+
+          Button {
+            creatingAccount.toggle()
+            authError = nil
+          } label: {
+            Text(creatingAccount ? "Already have an account? Sign in" : "New here? Create an account")
+              .font(AppType.bodyMedium)
+              .foregroundStyle(AppColor.ink)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 14)
           }
         }
         .padding(.horizontal, 28)
@@ -440,10 +392,9 @@ struct OnboardingView: View {
     UISelectionFeedbackGenerator().selectionChanged()
     withAnimation(.easeInOut(duration: 0.28)) {
       switch phase {
-      case .otp, .email:
+      case .email:
         phase = .signup
-        otp = ""
-        otpError = false
+        authError = nil
       case .signup:
         phase = .explain
         page = pages.count - 1
@@ -453,64 +404,71 @@ struct OnboardingView: View {
     }
   }
 
-  private func sendCode() {
-    guard canSendCode else { return }
-    otp = ""
-    otpError = false
-    resendSeconds = 30
-    UINotificationFeedbackGenerator().notificationOccurred(.success)
-    withAnimation(.easeInOut(duration: 0.28)) {
-      phase = .otp
+  private func submitEmail() {
+    guard canSubmitEmail, !busy else { return }
+    busy = true
+    authError = nil
+    let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    Task {
+      do {
+        if creatingAccount {
+          try await store.signUp(name: trimmedName, email: trimmedEmail, password: password)
+        } else {
+          try await store.signIn(email: trimmedEmail, password: password)
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+      } catch {
+        authError = error.localizedDescription
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+      }
+      busy = false
     }
-    tickResend()
   }
 
-  private func tickResend() {
-    guard resendSeconds > 0 else { return }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-      guard phase == .otp, resendSeconds > 0 else { return }
-      resendSeconds -= 1
-      tickResend()
+  private func startGoogle() {
+    guard !busy else { return }
+    busy = true
+    authError = nil
+    Task {
+      do {
+        try await store.signInWithGoogle()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+      } catch {
+        authError = error.localizedDescription
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+      }
+      busy = false
     }
   }
 
-  private func verifyOTP() {
-    guard canVerifyOTP else { return }
-    // Demo: any 6-digit code works except 000000
-    if otp == "000000" {
-      otpError = true
-      UINotificationFeedbackGenerator().notificationOccurred(.error)
-      return
+  private func startApple() {
+    guard !busy else { return }
+    authError = nil
+    appleSignIn.onFinish = { result in
+      switch result {
+      case .success(let credential):
+        busy = true
+        Task {
+          do {
+            try await store.signInWithApple(
+              idToken: credential.idToken,
+              nonce: credential.nonce,
+              name: credential.name
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+          } catch {
+            authError = error.localizedDescription
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+          }
+          busy = false
+        }
+      case .failure(let error):
+        if (error as NSError).code == ASAuthorizationError.canceled.rawValue { return }
+        authError = error.localizedDescription
+      }
     }
-    store.updateMeProfile(
-      name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-      contact: phone.trimmingCharacters(in: .whitespacesAndNewlines),
-      method: .phone
-    )
-    UINotificationFeedbackGenerator().notificationOccurred(.success)
-    onFinished()
-  }
-
-  private func finishWithGoogle() {
-    let resolved = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    store.updateMeProfile(
-      name: resolved.isEmpty ? "Karen" : resolved,
-      contact: "",
-      method: .google
-    )
-    UINotificationFeedbackGenerator().notificationOccurred(.success)
-    onFinished()
-  }
-
-  private func finishWithEmail() {
-    guard canCreateEmailAccount else { return }
-    store.updateMeProfile(
-      name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-      contact: email.trimmingCharacters(in: .whitespacesAndNewlines),
-      method: .email
-    )
-    UINotificationFeedbackGenerator().notificationOccurred(.success)
-    onFinished()
+    appleSignIn.start()
   }
 }
 
@@ -658,5 +616,59 @@ private struct OnboardingVisual: View {
       ("Fri", "Date night · together", AppColor.shared),
       ("Sat", "Climbing · Thomas", AppColor.partner),
     ]
+  }
+}
+
+@MainActor
+final class AppleSignInCoordinator: NSObject, ObservableObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+  var onFinish: ((Result<(idToken: String, nonce: String, name: String?), Error>) -> Void)?
+  private var rawNonce = ""
+
+  func start() {
+    rawNonce = Self.randomNonce()
+    let request = ASAuthorizationAppleIDProvider().createRequest()
+    request.requestedScopes = [.fullName, .email]
+    request.nonce = Self.sha256(rawNonce)
+    let controller = ASAuthorizationController(authorizationRequests: [request])
+    controller.delegate = self
+    controller.presentationContextProvider = self
+    controller.performRequests()
+  }
+
+  func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    guard
+      let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+      let tokenData = credential.identityToken,
+      let token = String(data: tokenData, encoding: .utf8)
+    else {
+      onFinish?(.failure(BackendError.message("Apple did not return a sign-in token.")))
+      return
+    }
+    let name = [credential.fullName?.givenName, credential.fullName?.familyName]
+      .compactMap { $0 }
+      .joined(separator: " ")
+    onFinish?(.success((token, rawNonce, name.isEmpty ? nil : name)))
+  }
+
+  func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    onFinish?(.failure(error))
+  }
+
+  func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+      .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+  }
+
+  private static func randomNonce(length: Int = 32) -> String {
+    let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+    var bytes = [UInt8](repeating: 0, count: length)
+    _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+    return String(bytes.map { charset[Int($0) % charset.count] })
+  }
+
+  private static func sha256(_ input: String) -> String {
+    SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
   }
 }

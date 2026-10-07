@@ -9,13 +9,15 @@ struct ProfileView: View {
   @State private var startMinute = 0
   @State private var endHour = 17
   @State private var endMinute = 0
-  @State private var workHoursSet = true
+  @State private var workHoursSet = false
   @State private var openDropdown: WorkDropdown?
   @State private var showLogoutAlert = false
   @State private var showRemovePartnerAlert = false
   @State private var shareKind: ShareKind = .availability
   @State private var showShareSheet = false
   @State private var showCalendarShareWarning = false
+  @State private var showDisconnectGoogle = false
+  @State private var shareError: String?
   @State private var notifPrefs: [NotifPref] = [
     .init(id: "rsvp", title: "RSVP requests", subtitle: "When Thomas sends a plan that needs your reply", value: true),
     .init(id: "replies", title: "Invite replies", subtitle: "When someone accepts, declines, or suggests a time", value: true),
@@ -65,6 +67,15 @@ struct ProfileView: View {
       pickingColor = false
       page = .main
       openDropdown = nil
+      if let start = store.workStartMinute, let end = store.workEndMinute {
+        workHoursSet = true
+        startHour = start / 60
+        startMinute = start % 60
+        endHour = end / 60
+        endMinute = end % 60
+      } else {
+        workHoursSet = false
+      }
     }
     .sheet(isPresented: $showShareSheet) {
       ActivityShareSheet(items: shareActivityItems) {
@@ -73,7 +84,10 @@ struct ProfileView: View {
     }
     .alert("Log out", isPresented: $showLogoutAlert) {
       Button("Cancel", role: .cancel) {}
-      Button("Log out", role: .destructive) { isPresented = false }
+      Button("Log out", role: .destructive) {
+        isPresented = false
+        store.signOut()
+      }
     } message: {
       Text("You’ll need to sign in again to sync plans.")
     }
@@ -87,11 +101,26 @@ struct ProfileView: View {
     } message: {
       Text("\(store.couple.partner.name) won’t see your shared calendar anymore, and their events will be removed from yours.")
     }
+    .alert("Disconnect Google Calendar?", isPresented: $showDisconnectGoogle) {
+      Button("Cancel", role: .cancel) {}
+      Button("Disconnect", role: .destructive) {
+        Task { await store.disconnectGoogleCalendar() }
+      }
+    } message: {
+      Text("Ours will stop reading and writing this Google Calendar. Events already imported stay on your calendar.")
+    }
+    .alert("Couldn’t share", isPresented: Binding(
+      get: { shareError != nil },
+      set: { if !$0 { shareError = nil } }
+    )) {
+      Button("OK", role: .cancel) { shareError = nil }
+    } message: {
+      Text(shareError ?? "")
+    }
     .alert("Share with one person only", isPresented: $showCalendarShareWarning) {
       Button("Cancel", role: .cancel) {}
       Button("Continue") {
-        shareKind = .calendar
-        showShareSheet = true
+        Task { await beginShare(.calendar) }
       }
     } message: {
       Text("You can only share calendars indefinitely with one person at a time. Inviting someone else later means unsharing with your current partner first.")
@@ -160,17 +189,17 @@ struct ProfileView: View {
 
         if pickingColor {
           HStack(spacing: 10) {
-            ForEach(Array(AppColor.avatarColors.enumerated()), id: \.offset) { _, swatch in
+            ForEach(AvatarPalette.swatches, id: \.hex) { swatch in
               Button {
-                store.meColor = swatch
+                store.setAvatarColor(hex: swatch.hex)
                 pickingColor = false
                 UISelectionFeedbackGenerator().selectionChanged()
               } label: {
                 Circle()
-                  .fill(swatch)
+                  .fill(swatch.color)
                   .frame(width: 28, height: 28)
                   .overlay(
-                    Circle().stroke(store.meColor == swatch ? AppColor.ink : Color.clear, lineWidth: 2)
+                    Circle().stroke(store.meColor == swatch.color ? AppColor.ink : Color.clear, lineWidth: 2)
                   )
               }
             }
@@ -191,7 +220,7 @@ struct ProfileView: View {
         detailRow("Name", store.couple.me.name)
         divider
         detailRow(accountContactLabel, store.couple.me.email)
-        if store.meLoginMethod != .phone && store.meLoginMethod != .google {
+        if store.meLoginMethod == .email {
           divider
           detailRow("Password", "••••••••")
         }
@@ -221,6 +250,17 @@ struct ProfileView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
           }
+        } else if store.partnerInvitePending {
+          HStack {
+            Text("Invite pending")
+              .font(AppFont.poppins(.regular, size: 15))
+              .foregroundStyle(AppColor.ink)
+            Spacer()
+            Button("Cancel") { store.removePartner() }
+              .font(AppFont.poppins(.medium, size: 14))
+              .foregroundStyle(AppColor.danger)
+          }
+          .padding(16)
         } else {
           Text("No one shared yet")
             .font(AppFont.poppins(.regular, size: 15))
@@ -239,13 +279,38 @@ struct ProfileView: View {
       sectionLabel("Share")
       card {
         shareActionRow(.availability) {
-          shareKind = .availability
-          showShareSheet = true
+          Task { await beginShare(.availability) }
         }
         if !store.partnerLinked {
           divider
           shareActionRow(.calendar) {
             showCalendarShareWarning = true
+          }
+        }
+      }
+      if !store.availabilityLinks.isEmpty {
+        sectionLabel("Availability links")
+        card {
+          ForEach(Array(store.availabilityLinks.enumerated()), id: \.element.id) { index, link in
+            if index > 0 { divider }
+            HStack(spacing: 12) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(link.status == "active" ? "Active" : "Waiting")
+                  .font(AppFont.poppins(.medium, size: 15))
+                  .foregroundStyle(AppColor.ink)
+                Text("Expires \(DateUtils.format(link.expiresAt, "MMM d"))")
+                  .font(AppFont.poppins(.regular, size: 12))
+                  .foregroundStyle(AppColor.muted)
+              }
+              Spacer()
+              Button("Revoke") {
+                Task { await store.revokeAvailability(link.id) }
+              }
+              .font(AppFont.poppins(.medium, size: 14))
+              .foregroundStyle(AppColor.danger)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
           }
         }
       }
@@ -257,6 +322,14 @@ struct ProfileView: View {
         actionRow("Set work hours", value: workHoursLabel) {
           openDropdown = nil
           page = .workHours
+        }
+        divider
+        actionRow("Google Calendar", value: store.googleEmail ?? "Not connected") {
+          if store.googleEmail == nil {
+            Task { await store.connectGoogleCalendar() }
+          } else {
+            showDisconnectGoogle = true
+          }
         }
       }
       card {
@@ -282,8 +355,9 @@ struct ProfileView: View {
 
   private var accountContactLabel: String {
     switch store.meLoginMethod {
-    case .phone: return "Phone number"
-    case .email, .google: return "Email"
+    case .apple: return "Apple ID"
+    case .google: return "Google"
+    case .email: return "Email"
     }
   }
 
@@ -386,6 +460,7 @@ struct ProfileView: View {
 
         Button {
           workHoursSet = false
+          persistWorkHours()
           openDropdown = nil
           UINotificationFeedbackGenerator().notificationOccurred(.success)
         } label: {
@@ -399,6 +474,7 @@ struct ProfileView: View {
       } else {
         Button {
           workHoursSet = true
+          persistWorkHours()
           UISelectionFeedbackGenerator().selectionChanged()
         } label: {
           Text("Set work hours")
@@ -412,6 +488,27 @@ struct ProfileView: View {
         .padding(.top, 24)
       }
     }
+  }
+
+  private func beginShare(_ kind: ShareKind) async {
+    do {
+      try await store.prepareShare(kind)
+      shareKind = kind
+      showShareSheet = true
+    } catch {
+      shareError = error.localizedDescription
+    }
+  }
+
+  private func persistWorkHours() {
+    guard workHoursSet else {
+      store.setWorkHours(start: nil, end: nil)
+      return
+    }
+    store.setWorkHours(
+      start: startHour * 60 + startMinute,
+      end: endHour * 60 + endMinute
+    )
   }
 
   private var shareActivityItems: [Any] {
@@ -577,6 +674,7 @@ struct ProfileView: View {
               Button {
                 onPick(h, m)
                 workHoursSet = true
+                persistWorkHours()
                 openDropdown = nil
                 UISelectionFeedbackGenerator().selectionChanged()
               } label: {

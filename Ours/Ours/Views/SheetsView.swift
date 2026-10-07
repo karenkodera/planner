@@ -1190,7 +1190,7 @@ struct RequestsSheet: View {
               HStack {
                 VStack(alignment: .leading, spacing: 3) {
                   Text(r.title).font(AppFont.poppins(.medium, size: 16)).foregroundStyle(AppColor.ink)
-                  Text("\(DateUtils.format(r.proposedStart, "EEE · h:mm a")) · From \(store.couple.partner.shortName)")
+                  Text("\(DateUtils.format(r.proposedStart, "EEE · h:mm a")) · From \(store.requestCounterpartyName(r))")
                     .font(AppType.caption)
                     .foregroundStyle(AppColor.muted)
                 }
@@ -1216,7 +1216,7 @@ struct RequestsSheet: View {
 
     return SheetChrome(
       title: detail.title,
-      subtitle: "From \(fromPartner ? store.couple.partner.name : "you")",
+      subtitle: "From \(fromPartner ? store.requestCounterpartyName(detail) : "you")",
       onClose: { store.closeSheet() }
     ) {
       Text(DateUtils.format(start, "MMMM d"))
@@ -1287,7 +1287,7 @@ struct RequestsSheet: View {
   private func editInviteView(_ detail: SharedRequest) -> some View {
     SheetChrome(
       title: "Edit invite",
-      subtitle: "Awaiting reply from \(store.couple.partner.name)",
+      subtitle: "Awaiting reply from \(store.requestCounterpartyName(detail))",
       onClose: { store.closeSheet() }
     ) {
       editFieldLabel("Title")
